@@ -10,6 +10,11 @@ import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./ap
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
 const LS_WISHLIST = "ssp:wishlist";
+// Google sign-in (Identity Services): the client id is public, not a
+// secret — the worker verifies Google's signed ID token itself, so no
+// client secret is stored anywhere. Filled in once Zakkai creates the
+// OAuth client; while empty, the site simply runs signed-out.
+const GOOGLE_CLIENT_ID = "";
 const $ = (sel) => document.querySelector(sel);
 
 function loadSelection() {
@@ -67,6 +72,8 @@ const savedUrls = () => new Set(wishlist.items.map((i) => i.url));
 function saveWishlist() {
   saveLocal(LS_WISHLIST, JSON.stringify(wishlist));
   renderWishlistCount();
+  // Server sync is fire-and-forget; the local copy never waits on it.
+  pushWishlistToServer();
 }
 
 function renderWishlistCount() {
@@ -238,6 +245,99 @@ function renderResults() {
   section.innerHTML = html;
 }
 
+// ---------------------------------------------------------------------------
+// Google sign-in + server wishlist sync
+// ---------------------------------------------------------------------------
+
+let signedInUser = null;
+const workerFetch = (path, opts = {}) =>
+  fetch(`${WORKER_URL}${path}`, { ...opts, credentials: "include" });
+
+async function pushWishlistToServer() {
+  if (!signedInUser || !WORKER_URL) return;
+  try {
+    await workerFetch("/api/wishlist", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(wishlist),
+    });
+  } catch { /* local copy is authoritative until the next sync */ }
+}
+
+async function syncWishlistFromServer() {
+  if (!WORKER_URL) return;
+  try {
+    const res = await workerFetch("/api/wishlist");
+    if (!res.ok) return;
+    const server = await res.json();
+    const seenUrls = new Set(wishlist.items.map((i) => i.url));
+    for (const i of server.items || []) {
+      if (i.url && !seenUrls.has(i.url)) { wishlist.items.push(i); seenUrls.add(i.url); }
+    }
+    const seenTitles = new Set(wishlist.titles.map((t) => t.toLowerCase()));
+    for (const t of server.titles || []) {
+      if (t && !seenTitles.has(String(t).toLowerCase())) { wishlist.titles.push(t); seenTitles.add(String(t).toLowerCase()); }
+    }
+    saveWishlist();
+    if (!$("#wishlist-view").classList.contains("d-none")) renderWishlist();
+    await pushWishlistToServer();
+  } catch { /* stay local */ }
+}
+
+function showSignedIn(user) {
+  signedInUser = user;
+  $("#auth-note").classList.add("d-none");
+  $("#gsi-button").classList.add("d-none");
+  $("#auth-email").textContent = user.email;
+  $("#auth-signedin").classList.remove("d-none");
+}
+
+function showSignedOut() {
+  signedInUser = null;
+  $("#auth-signedin").classList.add("d-none");
+  $("#auth-note").classList.remove("d-none");
+  $("#gsi-button").classList.remove("d-none");
+}
+
+async function handleGoogleCredential(response) {
+  if (!WORKER_URL) return;
+  try {
+    const res = await workerFetch("/auth/google", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+    if (!res.ok) return;
+    showSignedIn(await res.json());
+    await syncWishlistFromServer();
+  } catch { /* stay signed out */ }
+}
+
+function initGoogleSignIn(attempts = 0) {
+  if (!GOOGLE_CLIENT_ID) {
+    $("#auth-note").textContent = "Google sign-in is being set up — searching and the local wishlist work without it.";
+    return;
+  }
+  if (!window.google?.accounts?.id) {
+    if (attempts < 20) setTimeout(() => initGoogleSignIn(attempts + 1), 500);
+    return;
+  }
+  window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+  window.google.accounts.id.renderButton(document.getElementById("gsi-button"), { theme: "outline", size: "medium" });
+}
+
+async function refreshAuth() {
+  if (!WORKER_URL) return;
+  try {
+    const res = await workerFetch("/auth/me");
+    if (res.ok) {
+      showSignedIn(await res.json());
+      await syncWishlistFromServer();
+    } else {
+      showSignedOut();
+    }
+  } catch { showSignedOut(); }
+  initGoogleSignIn();
+}
+
 function renderWishlist() {
   const titlesWrap = $("#wish-titles");
   const itemsWrap = $("#wish-items");
@@ -381,6 +481,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("#wishlist-nav-btn").addEventListener("click", showWishlist);
   $("#back-to-search").addEventListener("click", showSearchView);
+  $("#signout-btn").addEventListener("click", async () => {
+    try { await workerFetch("/auth/logout", { method: "POST" }); } catch { /* ignore */ }
+    showSignedOut();
+  });
+  refreshAuth();
   $("#wish-title-form").addEventListener("submit", (e) => {
     e.preventDefault();
     addWishTitle($("#wish-title-input").value);

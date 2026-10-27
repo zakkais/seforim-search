@@ -24,7 +24,16 @@
         <span class="navbar-brand font-display fw-semibold mb-0">Seforim Search</span>
       </div>
       <div class="collapse navbar-collapse" id="nav-panel">
-        <p class="nav-category mb-1 mt-2">Wishlist</p>
+        <p class="nav-category mb-1 mt-2">Account</p>
+        <div id="auth-area" class="mb-2">
+          <div id="gsi-button"></div>
+          <p id="auth-note" class="text-secondary small mb-0">Sign in with Google to sync your wishlist across devices. Searching stays open without signing in.</p>
+          <div id="auth-signedin" class="d-none">
+            <p class="mb-1">Signed in as <span id="auth-email" class="fw-medium"></span></p>
+            <button id="signout-btn" type="button" class="btn btn-sm save-btn">Sign out</button>
+          </div>
+        </div>
+        <p class="nav-category mb-1 mt-3">Wishlist</p>
         <ul class="navbar-nav">
           <li class="nav-item"><button id="wishlist-nav-btn" type="button" class="nav-link text-start">My wishlist <span id="wishlist-count" class="text-secondary"></span></button></li>
         </ul>
@@ -122,6 +131,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script type="module" src="./ui.js?v=4"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script type="module" src="./ui.js?v=5"></script>
 </body>
 </html>
