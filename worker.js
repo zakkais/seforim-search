@@ -300,9 +300,12 @@ async function fetchStoreText(store, query) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 20000);
   try {
+    // Eichler's WAF blocks desktop Chrome user-agents (403) while
+    // accepting a plain generic agent from the same IP, so it gets one.
+    const ua = store.id === "eichlers" ? "Mozilla/5.0" : UA;
     const res = await fetch(url, {
       signal: ctrl.signal, redirect: "follow",
-      headers: { "User-Agent": UA, "Accept": "text/html,application/json,*/*", "Accept-Language": "en-US,en;q=0.9" },
+      headers: { "User-Agent": ua, "Accept": "text/html,application/json,*/*", "Accept-Language": "en-US,en;q=0.9" },
     });
     if (!res.ok) return { ok: false, httpStatus: res.status, text: null };
     return { ok: true, httpStatus: res.status, text: await res.text() };
