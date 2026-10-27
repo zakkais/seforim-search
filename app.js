@@ -58,7 +58,7 @@ var MAX_PER_STORE = 24;
 // While this is empty, the site falls back to direct browser fetching
 // (which most stores block via CORS) plus the link-out button.
 // ---------------------------------------------------------------------------
-var WORKER_URL = "";
+var WORKER_URL = "https://seforim-search.zakkaishusterman01.workers.dev";
 // ---------------------------------------------------------------------------
 // Transliteration spelling variants. Applied per word, not just to the
 // whole query: searching "midrash rabbah" also searches "medrash rabbah",
