@@ -1,12 +1,15 @@
 // Seforim Search (public) — static UI.
 // All searching happens in the visitor's browser (see app.js for the store
-// parsers and fetch chain). Store selections and the sort choice are kept
-// in localStorage only. No accounts, no checkout, no tracking.
+// parsers and fetch chain). Store selections, the sort choice, and the
+// wishlist are kept in localStorage only. No accounts yet, no checkout,
+// no tracking — sign-in, when it lands, will sync this same wishlist
+// (items keyed by product URL, plus title-only entries) per user.
 
 import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./app.js";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
+const LS_WISHLIST = "ssp:wishlist";
 const $ = (sel) => document.querySelector(sel);
 
 function loadSelection() {
@@ -48,6 +51,65 @@ let activeVariants = [];
 let results = {}; // storeId -> StoreResult
 let runId = 0;
 
+function loadWishlist() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LS_WISHLIST) || "{}");
+    return {
+      items: Array.isArray(parsed.items) ? parsed.items : [],
+      titles: Array.isArray(parsed.titles) ? parsed.titles : [],
+    };
+  } catch { return { items: [], titles: [] }; }
+}
+let wishlist = loadWishlist();
+const productByUrl = new Map(); // url -> { product, store }
+const savedUrls = () => new Set(wishlist.items.map((i) => i.url));
+
+function saveWishlist() {
+  saveLocal(LS_WISHLIST, JSON.stringify(wishlist));
+  renderWishlistCount();
+}
+
+function renderWishlistCount() {
+  const el = $("#wishlist-count");
+  if (!el) return;
+  const n = wishlist.items.length + wishlist.titles.length;
+  el.textContent = n ? `(${n})` : "";
+}
+
+function toggleWish(url) {
+  const found = productByUrl.get(url);
+  const idx = wishlist.items.findIndex((i) => i.url === url);
+  if (idx >= 0) {
+    wishlist.items.splice(idx, 1);
+  } else if (found) {
+    const { product, store } = found;
+    wishlist.items.unshift({
+      url: product.url, title: product.title, imageUrl: product.imageUrl || null,
+      priceText: product.priceText || null, compareAtText: product.compareAtText || null,
+      storeId: store.id, storeName: store.name,
+    });
+  }
+  saveWishlist();
+  if (!$("#wishlist-view").classList.contains("d-none")) renderWishlist();
+  renderResults();
+}
+
+function addWishTitle(title) {
+  const t = String(title || "").trim();
+  if (!t) return;
+  if (!wishlist.titles.some((x) => x.toLowerCase() === t.toLowerCase())) {
+    wishlist.titles.unshift(t);
+  }
+  saveWishlist();
+  renderWishlist();
+}
+
+function removeWishTitle(title) {
+  wishlist.titles = wishlist.titles.filter((x) => x !== title);
+  saveWishlist();
+  renderWishlist();
+}
+
 const enabledStores = () => STORES.filter((s) => selection[s.id]);
 
 // ---------------------------------------------------------------------------
@@ -85,13 +147,17 @@ function renderStoresButton() {
 const BOOK_SVG = `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 4.5v15Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>`;
 const FALLBACK_IMG = `<div class="product-img d-flex align-items-center justify-content-center text-secondary">${BOOK_SVG}</div>`;
 
-function productCard(store, p) {
+function productCard(store, p, wishMode) {
   const price = p.priceText
     ? `<span class="fw-bold price">${esc(p.priceText)}</span>` +
       (p.compareAtText
         ? `<span class="text-secondary text-decoration-line-through small ms-2">${esc(p.compareAtText)}</span>`
         : "")
     : `<span class="text-secondary small">Price at store</span>`;
+  const saved = savedUrls().has(p.url);
+  const wishBtn = wishMode === "remove"
+    ? `<button type="button" class="btn btn-sm save-btn" data-wish-url="${esc(p.url)}">Remove</button>`
+    : `<button type="button" class="btn btn-sm save-btn ${saved ? "saved" : ""}" data-wish-url="${esc(p.url)}">${saved ? "♥ Saved" : "♡ Save"}</button>`;
   const img = p.imageUrl
     ? `<img src="${esc(p.imageUrl)}" alt="${esc(p.title)}" loading="lazy"
             class="w-100 product-img" onerror="this.outerHTML=window.__sspFallbackImg">`
@@ -107,13 +173,15 @@ function productCard(store, p) {
           <a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"
              class="stretched-link font-display fw-medium text-decoration-none product-title"
              aria-label="View ${esc(p.title)} at ${esc(store.name)}">${esc(p.title)}</a>
-          <div class="mt-auto pt-2"><p class="mb-0">${price}</p></div>
+          <div class="mt-auto pt-2 d-flex justify-content-between align-items-center gap-2"><p class="mb-0">${price}</p>${wishBtn}</div>
         </div>
       </div>
     </div>`;
 }
 
 function renderResults() {
+  // While the wishlist view is open, results stay hidden and untouched.
+  if (!$("#wishlist-view").classList.contains("d-none")) return;
   const section = $("#results");
   if (!activeQuery) {
     section.innerHTML = "";
@@ -151,7 +219,10 @@ function renderResults() {
   for (const store of stores) {
     const r = results[store.id];
     if (r && r.status === "ok") {
-      for (const p of r.products) merged.push({ store, product: p });
+      for (const p of r.products) {
+        merged.push({ store, product: p });
+        productByUrl.set(p.url, { product: p, store });
+      }
     }
   }
   const sorted = sortProducts(merged.map((m) => m.product), sortMode, activeQuery);
@@ -165,6 +236,47 @@ function renderResults() {
     html += `<p class="mt-3 p-3 rounded text-secondary empty-box">No listings matched “${esc(activeQuery)}” at the included stores.</p>`;
   }
   section.innerHTML = html;
+}
+
+function renderWishlist() {
+  const titlesWrap = $("#wish-titles");
+  const itemsWrap = $("#wish-items");
+  titlesWrap.innerHTML = wishlist.titles.length
+    ? `<p class="text-secondary small mb-2">Titles to look up later — tap one to search it:</p>` +
+      wishlist.titles.map((t) => `
+        <div class="wish-title-row d-flex justify-content-between align-items-center gap-2 px-3 py-2 mb-2">
+          <button type="button" class="btn p-0 text-start fw-medium flex-grow-1" data-wish-title="${esc(t)}">${esc(t)}</button>
+          <button type="button" class="btn btn-sm text-secondary" data-wish-title-remove="${esc(t)}" aria-label="Remove ${esc(t)}">✕</button>
+        </div>`).join("")
+    : "";
+  if (wishlist.items.length) {
+    const cards = wishlist.items.map((i) => {
+      const store = STORES.find((s) => s.id === i.storeId) || { id: i.storeId, name: i.storeName };
+      productByUrl.set(i.url, { product: i, store });
+      return productCard(store, i, "remove");
+    }).join("");
+    itemsWrap.innerHTML = `<p class="text-secondary small mb-2">Saved listings:</p><div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">${cards}</div>`;
+  } else {
+    itemsWrap.innerHTML = wishlist.titles.length
+      ? ""
+      : `<p class="text-secondary mb-0">Nothing saved yet. Tap ♡ Save on any listing, or add a title above.</p>`;
+  }
+  renderWishlistCount();
+}
+
+function showWishlist() {
+  renderWishlist();
+  $("#results").classList.add("d-none");
+  $("#idle-state").classList.add("d-none");
+  $("#wishlist-view").classList.remove("d-none");
+  const panel = document.getElementById("nav-panel");
+  if (panel && window.bootstrap) window.bootstrap.Collapse.getOrCreateInstance(panel).hide();
+}
+
+function showSearchView() {
+  $("#wishlist-view").classList.add("d-none");
+  $("#results").classList.remove("d-none");
+  renderResults();
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +307,8 @@ function markLoading(store, query) {
 function runSearch(q) {
   const query = String(q || "").trim();
   if (!query || enabledStores().length === 0) return;
+  $("#wishlist-view").classList.add("d-none");
+  $("#results").classList.remove("d-none");
   $("#sefer-search").value = query;
   activeQuery = query;
   activeVariants = expandQuery(query);
@@ -263,6 +377,26 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   renderStoreChecks();
+  renderWishlistCount();
+
+  $("#wishlist-nav-btn").addEventListener("click", showWishlist);
+  $("#back-to-search").addEventListener("click", showSearchView);
+  $("#wish-title-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    addWishTitle($("#wish-title-input").value);
+    $("#wish-title-input").value = "";
+  });
+
+  // One delegated handler for all wishlist buttons (search results and
+  // wishlist view alike), so re-renders never lose their wiring.
+  document.addEventListener("click", (e) => {
+    const wishBtn = e.target.closest("[data-wish-url]");
+    if (wishBtn) { toggleWish(wishBtn.getAttribute("data-wish-url")); return; }
+    const titleBtn = e.target.closest("[data-wish-title]");
+    if (titleBtn) { runSearch(titleBtn.getAttribute("data-wish-title")); return; }
+    const titleRm = e.target.closest("[data-wish-title-remove]");
+    if (titleRm) { removeWishTitle(titleRm.getAttribute("data-wish-title-remove")); return; }
+  });
 
   const sortSel = $("#sort-select");
   sortSel.value = sortMode;
