@@ -14,7 +14,7 @@ const LS_WISHLIST = "ssp:wishlist";
 // secret — the worker verifies Google's signed ID token itself, so no
 // client secret is stored anywhere. Filled in once Zakkai creates the
 // OAuth client; while empty, the site simply runs signed-out.
-const GOOGLE_CLIENT_ID = "";
+const GOOGLE_CLIENT_ID = "891019147469-gbo84i1ugleie3sa0mrrccje77uv3ko6.apps.googleusercontent.com";
 const $ = (sel) => document.querySelector(sel);
 
 function loadSelection() {
