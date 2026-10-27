@@ -26,9 +26,9 @@ function loadSelection() {
 function loadSort() {
   try {
     const v = localStorage.getItem(LS_SORT);
-    if (v === "price-asc" || v === "price-desc" || v === "store") return v;
+    if (v === "price-asc" || v === "price-desc" || v === "alpha-asc" || v === "alpha-desc") return v;
   } catch { /* ignore */ }
-  return "store";
+  return "price-asc";
 }
 
 function saveLocal(key, value) {
@@ -137,8 +137,8 @@ function renderResults() {
     ${WORKER_URL ? "" : `<p class="text-secondary small mb-0">Fetching back-end not yet configured — results load directly from each store where the browser allows it. See README for the worker setup.</p>`}`;
 
   // One merged grid: products from every store are sorted together
-  // (by price, or in store order when sort is "store"), each card still
-  // carrying its store badge. Stores are never shown as separate sections.
+  // (by price or alphabetically), each card still carrying its store
+  // badge. Stores are never shown as separate sections.
   const loadingStores = stores.filter((s) => !results[s.id] || results[s.id].status === "loading");
   if (loadingStores.length) {
     html += `

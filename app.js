@@ -662,7 +662,12 @@ async function searchStore(store, query, variantQueries) {
   return { ...base, status: "ok", message: null, products: merged };
 }
 function sortProducts(products, mode) {
-  if (mode === "store")
+  if (mode === "alpha-asc" || mode === "alpha-desc") {
+    const dir = mode === "alpha-asc" ? 1 : -1;
+    return [...products].sort((a, b) =>
+      String(a.title || "").localeCompare(String(b.title || ""), undefined, { sensitivity: "base" }) * dir);
+  }
+  if (mode !== "price-asc" && mode !== "price-desc")
     return products;
   const dir = mode === "price-asc" ? 1 : -1;
   return [...products].sort((a, b) => {
