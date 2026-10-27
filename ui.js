@@ -147,20 +147,8 @@ function renderResults() {
         <span>Searching ${loadingStores.map((s) => esc(s.name)).join(", ")}…</span>
       </div>`;
   }
-  for (const store of stores) {
-    const r = results[store.id];
-    if (r && r.status === "error") {
-      const searchUrl = store.searchUrl(activeQuery);
-      html += `
-        <div class="mt-3 p-3 p-md-4 rounded error-box" role="alert">
-          <p class="mb-0">${esc(r.message || "")}</p>
-          <a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer"
-             class="btn mt-3 fw-semibold open-store-btn">Open ${esc(store.name)} search results ↗</a>
-        </div>`;
-    } else if (r && r.status === "empty") {
-      html += `<p class="mt-3 p-3 rounded text-secondary empty-box">${esc(r.message || "")}</p>`;
-    }
-  }
+  // Stores with no listings are simply left out — no error or empty
+  // notice per store, per the site owner's preference.
   const merged = [];
   for (const store of stores) {
     const r = results[store.id];
