@@ -8,11 +8,20 @@
 // it, and returns just those cards as JSON.
 //
 // What it is NOT: no public third-party CORS relay is used, no passwords,
-// no payments, no accounts, no store sign-ins. It only reads public
-// search pages, exactly as a browser would. If a store blocks the worker
+// no payments, no store sign-ins. It only reads public search pages,
+// exactly as a browser would. If a store blocks the worker
 // (bot check, 403, timeout), that store comes back as an honest error
 // and the frontend shows the link-out fallback — listings are never
 // invented.
+//
+// Accounts (added for the wishlist): sign-in is Google Identity Services
+// only. The frontend gets a Google ID token and hands it to this worker,
+// which verifies Google's signature and issuer/audience/expiry itself —
+// no Google client secret is stored anywhere, and no password of any
+// kind is ever collected or stored. A verified user gets a random
+// session id in KV (HttpOnly, Secure, SameSite=None cookie, 30 days);
+// the wishlist is stored in KV under that user's Google id, nothing
+// else. No payment or address data is ever handled.
 //
 // Deploy: see README.md ("Deploy the fetching worker"). Free tier is
 // enough to start (100,000 requests/day on Cloudflare Workers free).
@@ -302,7 +311,9 @@ async function fetchStoreText(store, query) {
   try {
     // Eichler's WAF blocks desktop Chrome user-agents (403) while
     // accepting a plain generic agent from the same IP, so it gets one.
-    const ua = store.id === "eichlers" ? "Mozilla/5.0" : UA;
+    // SeforimPlace does the same (desktop Chrome UA gets a 547-byte
+    // bot-check page; a plain agent gets the real ~315KB search page).
+    const ua = (store.id === "eichlers" || store.id === "seforimplace") ? "Mozilla/5.0" : UA;
     const res = await fetch(url, {
       signal: ctrl.signal, redirect: "follow",
       headers: { "User-Agent": ua, "Accept": "text/html,application/json,*/*", "Accept-Language": "en-US,en;q=0.9" },
@@ -339,24 +350,158 @@ async function searchStoreWorker(store, query) {
   return { ...base, status: "ok", message: null, products };
 }
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Cache-Control": `public, max-age=${CACHE_TTL_SECONDS}`,
-};
-function jsonResponse(obj, status = 200) {
-  return new Response(JSON.stringify(obj), { status, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+const PAGES_ORIGIN = "https://zakkais.github.io";
+function corsHeaders(request) {
+  const origin = request?.headers?.get("Origin");
+  if (origin === PAGES_ORIGIN) {
+    return {
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Credentials": "true",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+  }
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+}
+function jsonResponse(obj, status = 200, request = null, extraHeaders = {}) {
+  const cacheControl = (request?.url?.includes("/auth/") || request?.url?.includes("/api/"))
+    ? "no-store" : `public, max-age=${CACHE_TTL_SECONDS}`;
+  return new Response(JSON.stringify(obj), { status,
+    headers: { ...corsHeaders(request), "Cache-Control": cacheControl, "Content-Type": "application/json", ...extraHeaders } });
+}
+
+// ---------------------------------------------------------------------------
+// Google sign-in + wishlist storage (KV)
+// ---------------------------------------------------------------------------
+
+function parseCookies(request) {
+  const out = {};
+  for (const part of (request.headers.get("Cookie") || "").split(";")) {
+    const i = part.indexOf("=");
+    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return out;
+}
+function b64urlDecode(s) {
+  const norm = s.replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(norm.padEnd(norm.length + (4 - norm.length % 4) % 4, "=")), (c) => c.charCodeAt(0));
+}
+async function verifyGoogleIdToken(credential, clientId) {
+  const parts = String(credential || "").split(".");
+  if (parts.length !== 3) return null;
+  let header, payload;
+  try {
+    header = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[0])));
+    payload = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[1])));
+  } catch { return null; }
+  if (header.alg !== "RS256" || !header.kid) return null;
+  if (payload.iss !== "https://accounts.google.com" && payload.iss !== "accounts.google.com") return null;
+  if (payload.aud !== clientId) return null;
+  if (payload.exp * 1000 < Date.now()) return null;
+  if (payload.email_verified !== true && payload.email_verified !== "true") return null;
+  if (!payload.sub || !payload.email) return null;
+  let jwks;
+  try {
+    const res = await fetch("https://www.googleapis.com/oauth2/v3/certs");
+    if (!res.ok) return null;
+    jwks = await res.json();
+  } catch { return null; }
+  const jwk = (jwks.keys || []).find((k) => k.kid === header.kid);
+  if (!jwk) return null;
+  try {
+    const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    const signed = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+    const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64urlDecode(parts[2]), signed);
+    if (!ok) return null;
+  } catch { return null; }
+  return { sub: payload.sub, email: payload.email, name: payload.name || payload.email };
+}
+async function getSession(request, env) {
+  if (!env.SEFORIM_KV) return null;
+  const sid = parseCookies(request).ssp_session;
+  if (!sid) return null;
+  try {
+    const raw = await env.SEFORIM_KV.get(`sess:${sid}`);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (s.exp * 1000 < Date.now()) return null;
+    return s;
+  } catch { return null; }
+}
+function sessionCookie(sid, maxAge) {
+  return `ssp_session=${sid}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${maxAge}`;
+}
+function cleanWishlist(body) {
+  const items = Array.isArray(body?.items) ? body.items.slice(0, 500).map((i) => ({
+    url: String(i.url || "").slice(0, 2000), title: String(i.title || "").slice(0, 500),
+    imageUrl: i.imageUrl ? String(i.imageUrl).slice(0, 2000) : null,
+    priceText: i.priceText ? String(i.priceText).slice(0, 50) : null,
+    compareAtText: i.compareAtText ? String(i.compareAtText).slice(0, 50) : null,
+    storeId: String(i.storeId || "").slice(0, 50), storeName: String(i.storeName || "").slice(0, 100),
+  })).filter((i) => i.url && i.title) : [];
+  const titles = Array.isArray(body?.titles) ? [...new Set(body.titles.map((t) => String(t).slice(0, 300)).filter(Boolean))].slice(0, 200) : [];
+  return { items, titles };
+}
+async function handleAuth(request, env, url) {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders(request) });
+  }
+  if (!env.SEFORIM_KV) return jsonResponse({ error: "Storage not configured" }, 503, request);
+  if (url.pathname === "/auth/me") {
+    const s = await getSession(request, env);
+    if (!s) return jsonResponse({ error: "Not signed in" }, 401, request);
+    return jsonResponse({ email: s.email, name: s.name }, 200, request);
+  }
+  if (url.pathname === "/auth/logout") {
+    const sid = parseCookies(request).ssp_session;
+    if (sid) await env.SEFORIM_KV.delete(`sess:${sid}`);
+    return jsonResponse({ ok: true }, 200, request, { "Set-Cookie": sessionCookie("", 0) });
+  }
+  if (url.pathname === "/auth/google" && request.method === "POST") {
+    const clientId = env.GOOGLE_CLIENT_ID;
+    if (!clientId) return jsonResponse({ error: "Google sign-in not configured" }, 503, request);
+    let body;
+    try { body = await request.json(); } catch { return jsonResponse({ error: "Bad request" }, 400, request); }
+    const user = await verifyGoogleIdToken(body.credential, clientId);
+    if (!user) return jsonResponse({ error: "Invalid Google sign-in" }, 401, request);
+    const sid = crypto.randomUUID();
+    const exp = Math.floor(Date.now() / 1000) + 30 * 24 * 3600;
+    await env.SEFORIM_KV.put(`sess:${sid}`, JSON.stringify({ ...user, exp }), { expirationTtl: 30 * 24 * 3600 });
+    return jsonResponse({ email: user.email, name: user.name }, 200, request, { "Set-Cookie": sessionCookie(sid, 30 * 24 * 3600) });
+  }
+  if (url.pathname === "/api/wishlist") {
+    const s = await getSession(request, env);
+    if (!s) return jsonResponse({ error: "Not signed in" }, 401, request);
+    if (request.method === "GET") {
+      const raw = await env.SEFORIM_KV.get(`wish:${s.sub}`);
+      return jsonResponse(raw ? JSON.parse(raw) : { items: [], titles: [] }, 200, request);
+    }
+    if (request.method === "PUT") {
+      let body;
+      try { body = await request.json(); } catch { return jsonResponse({ error: "Bad request" }, 400, request); }
+      const cleaned = cleanWishlist(body);
+      await env.SEFORIM_KV.put(`wish:${s.sub}`, JSON.stringify(cleaned));
+      return jsonResponse(cleaned, 200, request);
+    }
+  }
+  return jsonResponse({ error: "Not found" }, 404, request);
 }
 
 export default {
   async fetch(request, env, ctx) {
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: CORS_HEADERS });
-    }
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/auth/") || url.pathname.startsWith("/api/")) {
+      return handleAuth(request, env, url);
+    }
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders(request) });
+    }
     if (url.pathname === "/stores") {
-      return jsonResponse({ stores: STORES.map((s) => ({ id: s.id, name: s.name, note: s.note ?? null })) });
+      return jsonResponse({ stores: STORES.map((s) => ({ id: s.id, name: s.name, note: s.note ?? null })) }, 200, request);
     }
     // Any other path (including "/") with a ?q= runs a search; without
     // ?q= it returns the store list, so the worker URL alone is a
