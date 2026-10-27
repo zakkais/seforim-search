@@ -245,21 +245,9 @@ function setAllStores(enabled) {
 window.__sspFallbackImg = FALLBACK_IMG;
 
 document.addEventListener("DOMContentLoaded", () => {
-  const navToggle = $("#nav-toggle");
-  const navPanel = $("#nav-panel");
-  navToggle.addEventListener("click", () => {
-    const open = navPanel.classList.toggle("d-none") === false;
-    navToggle.setAttribute("aria-expanded", String(open));
-    navToggle.setAttribute("aria-label", open ? "Close navigation menu" : "Open navigation menu");
-  });
-  navPanel.querySelectorAll("a").forEach((a) => {
-    a.addEventListener("click", () => {
-      navPanel.classList.add("d-none");
-      navToggle.setAttribute("aria-expanded", "false");
-      navToggle.setAttribute("aria-label", "Open navigation menu");
-    });
-  });
-
+  // The hamburger menu is Bootstrap's navbar collapse (see index.html);
+  // no custom toggle code — Bootstrap's bundle handles open/close, and
+  // each nav link also collapses the panel when tapped.
   renderStoreChecks();
 
   const sortSel = $("#sort-select");

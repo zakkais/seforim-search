@@ -10,22 +10,25 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link href="./styles.css" rel="stylesheet">
+  <link href="./styles.css?v=2" rel="stylesheet">
 </head>
 <body>
   <main class="container py-4 py-md-5" style="max-width:1120px">
 
-    <header class="d-flex align-items-center gap-2">
-      <button id="nav-toggle" type="button" class="nav-btn" aria-expanded="false" aria-controls="nav-panel" aria-label="Open navigation menu">☰</button>
-      <span class="font-display fw-semibold nav-title">Seforim Search</span>
-    </header>
-    <nav id="nav-panel" class="nav-panel card mt-2 d-none" aria-label="Site navigation">
-      <div class="card-body py-3">
-        <p class="nav-category mb-2">External resources</p>
-        <ul class="list-unstyled mb-0 nav-links">
-          <li><a href="https://www.chabad.org/torah-texts/" target="_blank" rel="noopener noreferrer">Chabad Torah Texts <span aria-hidden="true">↗</span></a></li>
-          <li><a href="https://hebrewbooks.org/" target="_blank" rel="noopener noreferrer">HebrewBooks <span aria-hidden="true">↗</span></a></li>
-          <li><a href="https://www.sefaria.org/" target="_blank" rel="noopener noreferrer">Sefaria <span aria-hidden="true">↗</span></a></li>
+    <nav class="navbar px-0" aria-label="Site navigation">
+      <div class="container-fluid px-0">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav-panel"
+                aria-controls="nav-panel" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <span class="navbar-brand font-display fw-semibold mb-0">Seforim Search</span>
+      </div>
+      <div class="collapse navbar-collapse" id="nav-panel">
+        <p class="nav-category mb-1 mt-2">External resources</p>
+        <ul class="navbar-nav">
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="collapse" data-bs-target="#nav-panel" href="https://www.chabad.org/torah-texts/" target="_blank" rel="noopener noreferrer">Chabad Torah Texts <span aria-hidden="true">↗</span></a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="collapse" data-bs-target="#nav-panel" href="https://hebrewbooks.org/" target="_blank" rel="noopener noreferrer">HebrewBooks <span aria-hidden="true">↗</span></a></li>
+          <li class="nav-item"><a class="nav-link" data-bs-toggle="collapse" data-bs-target="#nav-panel" href="https://www.sefaria.org/" target="_blank" rel="noopener noreferrer">Sefaria <span aria-hidden="true">↗</span></a></li>
         </ul>
       </div>
     </nav>
@@ -111,6 +114,7 @@
     </footer>
   </main>
 
-  <script type="module" src="./ui.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="./ui.js?v=2"></script>
 </body>
 </html>
