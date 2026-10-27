@@ -136,51 +136,47 @@ function renderResults() {
     ${extraVariants.length ? `<p class="text-secondary small mb-0">Also searched for: ${extraVariants.map((v) => `“${esc(v)}”`).join(", ")}</p>` : ""}
     ${WORKER_URL ? "" : `<p class="text-secondary small mb-0">Fetching back-end not yet configured — results load directly from each store where the browser allows it. See README for the worker setup.</p>`}`;
 
+  // One merged grid: products from every store are sorted together
+  // (by price, or in store order when sort is "store"), each card still
+  // carrying its store badge. Stores are never shown as separate sections.
+  const loadingStores = stores.filter((s) => !results[s.id] || results[s.id].status === "loading");
+  if (loadingStores.length) {
+    html += `
+      <div class="mt-3 d-flex align-items-center gap-2 text-secondary">
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        <span>Searching ${loadingStores.map((s) => esc(s.name)).join(", ")}…</span>
+      </div>`;
+  }
   for (const store of stores) {
     const r = results[store.id];
-    const status = r ? r.status : "loading";
-    const searchUrl = store.searchUrl(activeQuery);
-    html += `
-    <article class="mt-4" aria-label="Results from ${esc(store.name)}">
-      <header class="d-flex flex-wrap align-items-baseline justify-content-between gap-2">
-        <h3 class="font-display fw-semibold mb-0 store-name">${esc(store.name)}
-          ${status === "ok" ? `<span class="text-secondary fw-normal ms-2 small">${r.products.length} listing${r.products.length === 1 ? "" : "s"}</span>` : ""}
-        </h3>
-        <a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" class="small fw-medium store-link">View at ${esc(store.name)} ↗</a>
-      </header>`;
-
-    if (status === "loading") {
-      html += `
-        <div class="mt-3">
-          <div class="d-flex align-items-center gap-2 text-secondary">
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            <span>Searching ${esc(store.name)}…</span>
-          </div>
-          <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-1" aria-hidden="true">
-            ${[0, 1, 2, 3].map(() => `
-              <div class="col"><div class="card h-100 placeholder-glow product-card">
-                <div class="placeholder w-100" style="height:150px"></div>
-                <div class="card-body"><span class="placeholder col-10"></span>
-                <span class="placeholder col-7 mt-2"></span>
-                <span class="placeholder col-4 mt-3"></span></div>
-              </div></div>`).join("")}
-          </div>
-        </div>`;
-    } else if (status === "error") {
+    if (r && r.status === "error") {
+      const searchUrl = store.searchUrl(activeQuery);
       html += `
         <div class="mt-3 p-3 p-md-4 rounded error-box" role="alert">
           <p class="mb-0">${esc(r.message || "")}</p>
           <a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer"
              class="btn mt-3 fw-semibold open-store-btn">Open ${esc(store.name)} search results ↗</a>
         </div>`;
-    } else if (status === "empty") {
+    } else if (r && r.status === "empty") {
       html += `<p class="mt-3 p-3 rounded text-secondary empty-box">${esc(r.message || "")}</p>`;
-    } else {
-      const products = sortProducts(r.products, sortMode);
-      html += `<div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-1">` +
-        products.map((p) => productCard(store, p)).join("") + `</div>`;
     }
-    html += `</article>`;
+  }
+  const merged = [];
+  for (const store of stores) {
+    const r = results[store.id];
+    if (r && r.status === "ok") {
+      for (const p of r.products) merged.push({ store, product: p });
+    }
+  }
+  const sorted = sortProducts(merged.map((m) => m.product), sortMode);
+  // sortProducts returns products, not pairs: re-pair by product identity
+  // via a Map so each card keeps its store badge after a global sort.
+  const byProduct = new Map(merged.map((m) => [m.product, m.store]));
+  if (sorted.length) {
+    html += `<div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-1">` +
+      sorted.map((p) => productCard(byProduct.get(p), p)).join("") + `</div>`;
+  } else if (!anyLoading) {
+    html += `<p class="mt-3 p-3 rounded text-secondary empty-box">No listings matched “${esc(activeQuery)}” at the included stores.</p>`;
   }
   section.innerHTML = html;
 }
