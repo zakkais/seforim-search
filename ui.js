@@ -7,8 +7,6 @@ import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./ap
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
-const EXAMPLES = ["midrash rabbah", "tanya", "mishnah berurah", "tehillim", "likkutei sichos"];
-
 const $ = (sel) => document.querySelector(sel);
 
 function loadSelection() {
@@ -273,13 +271,6 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#search-form").addEventListener("submit", (e) => {
     e.preventDefault();
     runSearch(input.value);
-  });
-
-  $("#examples").innerHTML = EXAMPLES.map((ex) =>
-    `<button type="button" class="btn btn-sm rounded-pill example-chip text-capitalize" data-q="${esc(ex)}">${esc(ex)}</button>`
-  ).join("");
-  $("#examples").querySelectorAll("button[data-q]").forEach((b) => {
-    b.addEventListener("click", () => runSearch(b.getAttribute("data-q")));
   });
 
   renderStoresButton();
