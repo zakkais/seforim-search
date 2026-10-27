@@ -243,9 +243,25 @@ function setAllStores(enabled) {
 window.__sspFallbackImg = FALLBACK_IMG;
 
 document.addEventListener("DOMContentLoaded", () => {
-  // The hamburger menu is Bootstrap's navbar collapse (see index.html);
-  // no custom toggle code — Bootstrap's bundle handles open/close, and
-  // each nav link also collapses the panel when tapped.
+  // The hamburger menu is Bootstrap's navbar collapse (see index.html):
+  // the toggler opens/closes it. Nav links must NOT carry
+  // data-bs-toggle="collapse" — Bootstrap blocks link navigation for
+  // those (preventDefault), which is why tapping a link closed the menu
+  // without opening anything. Instead, close the panel here on tap
+  // without touching the link's own navigation (it opens in a new tab).
+  const navPanelEl = document.getElementById("nav-panel");
+  if (navPanelEl) {
+    navPanelEl.querySelectorAll("a").forEach((a) => {
+      a.addEventListener("click", () => {
+        if (window.bootstrap) {
+          window.bootstrap.Collapse.getOrCreateInstance(navPanelEl).hide();
+        } else {
+          navPanelEl.classList.remove("show");
+        }
+      });
+    });
+  }
+
   renderStoreChecks();
 
   const sortSel = $("#sort-select");
