@@ -661,7 +661,61 @@ async function searchStore(store, query, variantQueries) {
   }
   return { ...base, status: "ok", message: null, products: merged };
 }
-function sortProducts(products, mode) {
+function normWords(s) {
+  return String(s || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(/\s+/).filter(Boolean);
+}
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    let cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+// Priority score for a title against the original query: lower is closer.
+// Tier: exact match, starts with the query, contains it, all query words
+// present, some query words present, none present. Within a tier, the
+// average per-word edit distance to the title's words breaks ties, so a
+// title spelled like the query ("midrash") outranks a farther variant
+// ("medrash", "midresh") and a merely similar word. Price, then title,
+// breaks remaining ties.
+function priorityScore(title, query) {
+  const qWords = normWords(query);
+  const tWords = normWords(title);
+  const q = qWords.join(" ");
+  const t = tWords.join(" ");
+  if (!q) return 0;
+  // A query word counts as matched if a title word is equal or within a
+  // small edit distance, so close spellings ("mishna" for "mishnah")
+  // count as matches instead of falling behind partial-word titles.
+  const minDists = qWords.map((w) => tWords.length ? Math.min(...tWords.map((tw) => levenshtein(w, tw))) : 99);
+  const matched = minDists.filter((d, i) => d <= Math.max(1, Math.floor(qWords[i].length / 3))).length;
+  let tier;
+  if (t === q) tier = 0;
+  else if (t.startsWith(q)) tier = 1;
+  else if (t.includes(q)) tier = 2;
+  else if (qWords.length && matched === qWords.length) tier = 3;
+  else if (matched > 0) tier = 4;
+  else tier = 5;
+  const avgDist = minDists.length ? minDists.reduce((a, b) => a + b, 0) / minDists.length : 99;
+  return tier * 1000 + avgDist * 10;
+}
+function sortProducts(products, mode, query) {
+  if (mode === "priority") {
+    return [...products].sort((a, b) => {
+      const d = priorityScore(a.title, query) - priorityScore(b.title, query);
+      if (d !== 0) return d;
+      if (a.priceAmount != null && b.priceAmount != null && a.priceAmount !== b.priceAmount)
+        return a.priceAmount - b.priceAmount;
+      return String(a.title || "").localeCompare(String(b.title || ""), undefined, { sensitivity: "base" });
+    });
+  }
   if (mode === "alpha-asc" || mode === "alpha-desc") {
     const dir = mode === "alpha-asc" ? 1 : -1;
     return [...products].sort((a, b) =>

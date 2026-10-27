@@ -26,7 +26,7 @@ function loadSelection() {
 function loadSort() {
   try {
     const v = localStorage.getItem(LS_SORT);
-    if (v === "price-asc" || v === "price-desc" || v === "alpha-asc" || v === "alpha-desc") return v;
+    if (v === "price-asc" || v === "price-desc" || v === "alpha-asc" || v === "alpha-desc" || v === "priority") return v;
   } catch { /* ignore */ }
   return "price-asc";
 }
@@ -168,7 +168,7 @@ function renderResults() {
       for (const p of r.products) merged.push({ store, product: p });
     }
   }
-  const sorted = sortProducts(merged.map((m) => m.product), sortMode);
+  const sorted = sortProducts(merged.map((m) => m.product), sortMode, activeQuery);
   // sortProducts returns products, not pairs: re-pair by product identity
   // via a Map so each card keeps its store badge after a global sort.
   const byProduct = new Map(merged.map((m) => [m.product, m.store]));
