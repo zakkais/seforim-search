@@ -1,0 +1,159 @@
+/* Seforim Search — bookshop theme on top of Bootstrap 5. */
+
+:root {
+  --bg: #f6f2ea;
+  --surface: #fffdf8;
+  --surface-alt: #efe8da;
+  --ink: #262019;
+  --dim: #7a7263;
+  --line: #e0d6c2;
+  --navy: #1d2a5b;
+  --gold: #a97c2f;
+  --rust: #9a3b26;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161310;
+    --surface: #211d17;
+    --surface-alt: #2b261e;
+    --ink: #f0ead9;
+    --dim: #a79c86;
+    --line: #3b352a;
+    --navy: #93a5e8;
+    --gold: #c9a24d;
+    --rust: #e08a72;
+    --bs-body-bg: #161310;
+    --bs-body-color: #f0ead9;
+    --bs-border-color: #3b352a;
+    --bs-secondary-color: #a79c86;
+    --bs-tertiary-bg: #2b261e;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+}
+
+.font-display {
+  font-family: "Spectral", "Iowan Old Style", Georgia, serif;
+}
+
+.hero-title { font-size: 2.1rem; line-height: 1.15; }
+.hero-lead { max-width: 620px; font-size: 1.02rem; }
+
+.search-input {
+  background-color: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.search-input:focus {
+  background-color: var(--surface);
+  color: var(--ink);
+  border-color: var(--navy);
+  box-shadow: 0 0 0 0.2rem rgba(29, 42, 91, 0.15);
+}
+
+.btn-navy {
+  --bs-btn-bg: var(--navy);
+  --bs-btn-border-color: var(--navy);
+  --bs-btn-color: #fff;
+  --bs-btn-hover-bg: var(--navy);
+  --bs-btn-hover-border-color: var(--navy);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: var(--navy);
+  --bs-btn-active-border-color: var(--navy);
+  --bs-btn-active-color: #fff;
+  --bs-btn-disabled-bg: var(--navy);
+  --bs-btn-disabled-border-color: var(--navy);
+  --bs-btn-disabled-color: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  .btn-navy { --bs-btn-color: #12172e; --bs-btn-hover-color: #12172e; --bs-btn-active-color: #12172e; --bs-btn-disabled-color: #12172e; }
+}
+.btn-navy:hover { filter: brightness(1.12); }
+
+.filter-btn, .sort-select {
+  border: 1px solid var(--line);
+  background-color: var(--surface);
+  color: var(--ink);
+}
+.sort-select:focus { border-color: var(--navy); box-shadow: 0 0 0 0.2rem rgba(29, 42, 91, 0.15); }
+
+.example-chip {
+  border: 1px solid var(--line);
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+.card { background-color: var(--surface); border-color: var(--line); }
+.panel-title { font-size: 1.25rem; }
+
+.form-check-input:checked {
+  background-color: #1d2a5b;
+  border-color: #1d2a5b;
+}
+
+.warning-text { color: var(--rust); }
+
+.results-rule { border-bottom: 2px solid var(--navy); }
+.results-title { font-size: 1.6rem; }
+.store-name { font-size: 1.3rem; }
+.store-link { color: var(--navy); }
+
+.product-card { background-color: var(--surface); border-color: var(--line); }
+.product-img-wrap { background-color: var(--surface-alt); }
+.product-img { height: 150px; object-fit: contain; }
+.product-title {
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sale-stamp {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  background-color: var(--rust);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.store-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.price { color: var(--navy); font-size: 1.12rem; }
+@media (prefers-color-scheme: dark) {
+  .price { color: var(--gold); }
+}
+
+.error-box { border: 1px solid var(--rust); background-color: var(--surface); }
+.open-store-btn {
+  border: 1px solid var(--line);
+  background-color: var(--surface-alt);
+  color: var(--ink);
+}
+.empty-box { border: 1px solid var(--line); background-color: var(--surface); }
+
+.idle-box { border: 1px solid var(--line); background-color: var(--surface); }
+.book-icon { width: fit-content; color: var(--gold); }
+.idle-text { max-width: 520px; font-size: 0.98rem; line-height: 1.6; }
+
+.footer-note { border-top: 1px solid var(--line); }
