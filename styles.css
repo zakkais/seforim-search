@@ -57,6 +57,16 @@ body {
    Bootstrap itself. Only the theme colours are overridden here, so the
    icon stays dark on a light page and light on a dark page. */
 .navbar { --bs-navbar-brand-color: var(--ink); --bs-navbar-brand-hover-color: var(--ink); }
+/* Sticky header + centred title: the bar (class site-header in
+   index.html) sticks to the top of the viewport while results scroll
+   underneath it, and the title sits dead centre of the bar. The title
+   is positioned against the bar itself, not pushed around by the
+   hamburger button on the left, so it stays centred at every width.
+   The bar gets the page background so scrolling cards do not show
+   through it; the background follows the light/dark theme via --bg. */
+.site-header { position: sticky; top: 0; z-index: 1030; background-color: var(--bg); }
+.site-header .container-fluid { position: relative; }
+.site-header .navbar-brand { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
 .navbar-toggler { border-color: var(--line); }
 .navbar-toggler:focus { box-shadow: 0 0 0 0.2rem rgba(29, 42, 91, 0.15); }
 @media (prefers-color-scheme: dark) {
