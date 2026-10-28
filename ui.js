@@ -30,6 +30,193 @@ import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./ap
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
 const LS_WISHLIST = "ssp:wishlist";
+const LS_LANG = "ssp:lang";
+// Languages for the footer switcher (index.html). English is the
+// default and stays available so visitors can always switch back.
+// Hebrew and Yiddish flip the page to right-to-left (see
+// applyLanguage). The non-English wordings are a first draft — product
+// titles, prices, and store names always stay exactly as the stores
+// list them, whatever the interface language is.
+const LANGS = [
+  { code: "en", dir: "ltr" },
+  { code: "he", dir: "rtl" },
+  { code: "yi", dir: "rtl" },
+  { code: "es", dir: "ltr" },
+  { code: "fr", dir: "ltr" },
+];
+const I18N = {
+  en: {
+    language: "Language:", account: "Account", wishlist: "Wishlist", external: "External resources",
+    authNote: "Sign in with Google to sync your wishlist across devices. Searching stays open without signing in.",
+    signedInAs: "Signed in as", signOut: "Sign out", myWishlist: "My wishlist",
+    searchPlaceholder: "Search", search: "Search", sortBy: "Sort by",
+    "sort_price-asc": "Price: low to high", "sort_price-desc": "Price: high to low",
+    sort_priority: "Priority: closest match", "sort_alpha-asc": "Title: A to Z", "sort_alpha-desc": "Title: Z to A",
+    includeInSearch: "Include in search", selectAll: "Select all", clear: "Clear",
+    noStores: "No stores are included — tick at least one to search.",
+    storeChoicesNote: "Your store choices are kept in this browser only.",
+    backToSearch: "Back to search", addTitleLabel: "Add a title to look up later",
+    addTitlePlaceholder: "e.g. midrash rabbah", addTitle: "Add title",
+    savedNote: "Saved in this browser, and synced across devices when you are signed in.",
+    idleText: "Type a title above — in English or Hebrew — and this page gathers the matching listings, each with its own cover and price.",
+    footerNote: "Listings, covers, and prices come live from each store's own website at search time. Searching needs no account; signing in with Google is optional and only syncs your wishlist. Your store choices and your local wishlist are kept in your own browser.",
+    storesIncluded: "Stores · {n} of {total} included",
+    save: "♡ Save", saved: "♥ Saved", remove: "Remove", onSale: "On sale", priceAtStore: "Price at store",
+    resultsFor: "Results for “{q}”", listingsLoadedOne: "1 listing loaded", listingsLoadedOther: "{n} listings loaded",
+    alsoSearchedFor: "Also searched for: ", searching: "Searching {stores}…",
+    noListings: "No listings matched “{q}” at the included stores.",
+    titlesToLookUp: "Titles to look up later — tap one to search it:",
+    savedListings: "Saved listings:",
+    nothingSaved: "Nothing saved yet. Tap ♡ Save on any listing, or add a title above.",
+  },
+  he: {
+    language: "שפה:", account: "חשבון", wishlist: "רשימת ספרים שמורים", external: "משאבים חיצוניים",
+    authNote: "היכנסו עם גוגל כדי לסנכרן את רשימת הספרים השמורים בין מכשירים. החיפוש פתוח גם בלי להיכנס.",
+    signedInAs: "מחובר/ת בתור", signOut: "התנתקות", myWishlist: "הספרים השמורים שלי",
+    searchPlaceholder: "חיפוש", search: "חיפוש", sortBy: "מיון לפי",
+    "sort_price-asc": "מחיר: מהנמוך לגבוה", "sort_price-desc": "מחיר: מהגבוה לנמוך",
+    sort_priority: "עדיפות: ההתאמה הקרובה ביותר", "sort_alpha-asc": "כותרת: מא׳ עד ת׳", "sort_alpha-desc": "כותרת: מת׳ עד א׳",
+    includeInSearch: "כלול בחיפוש", selectAll: "בחר הכל", clear: "נקה",
+    noStores: "לא נבחרו חנויות — סמן לפחות חנות אחת לחיפוש.",
+    storeChoicesNote: "בחירת החנויות נשמרת בדפדפן זה בלבד.",
+    backToSearch: "חזרה לחיפוש", addTitleLabel: "הוסף כותרת לחיפוש מאוחר יותר",
+    addTitlePlaceholder: "לדוגמה: מדרש רבה", addTitle: "הוסף כותרת",
+    savedNote: "נשמר בדפדפן זה, ומסונכרן בין מכשירים כשאתה מחובר.",
+    idleText: "הקלד כותרת למעלה — בעברית או באנגלית — והדף יאסוף את המודעות המתאימות, כל אחת עם הכריכה והמחיר שלה.",
+    footerNote: "המודעות, הכריכות והמחירים מגיעים בשידור חי מאתר כל חנות בעת החיפוש. החיפוש אינו דורש חשבון; כניסה עם גוגל היא אופציונלית ורק מסנכרנת את רשימת הספרים השמורים. בחירת החנויות ורשימת הספרים המקומית נשמרות בדפדפן שלך.",
+    storesIncluded: "חנויות · {n} מתוך {total} כלולות",
+    save: "♡ שמור", saved: "♥ נשמר", remove: "הסר", onSale: "במבצע", priceAtStore: "מחיר בחנות",
+    resultsFor: "תוצאות עבור “{q}”", listingsLoadedOne: "מודעה אחת נטענה", listingsLoadedOther: "{n} מודעות נטענו",
+    alsoSearchedFor: "חיפשנו גם: ", searching: "מחפש ב־{stores}…",
+    noListings: "לא נמצאו מודעות עבור “{q}” בחנויות הכלולות.",
+    titlesToLookUp: "כותרות לחיפוש מאוחר יותר — לחץ על אחת כדי לחפש אותה:",
+    savedListings: "מודעות שמורות:",
+    nothingSaved: "עדיין לא נשמר דבר. לחץ ♡ שמור על כל מודעה, או הוסף כותרת למעלה.",
+  },
+  yi: {
+    language: "שפּראַך:", account: "חשבון", wishlist: "ווישליסט", external: "דרויסנדיקע רעסורסן",
+    authNote: "צייכנט אײַן מיט גוגל כּדי צו סינקראָניזירן אײַער ווישליסט צווישן דיווייסעס. זוכן בלײַבט אָפֿן אָן אײַנצייכענען.",
+    signedInAs: "אײַנגעצייכנט ווי", signOut: "אַרויסצייכענען", myWishlist: "מיין ווישליסט",
+    searchPlaceholder: "זוכן", search: "זוכן", sortBy: "סאָרטירן לויט",
+    "sort_price-asc": "פּרײַז: פֿון ביליק צום טײַער", "sort_price-desc": "פּרײַז: פֿון טײַער צום ביליק",
+    sort_priority: "פּריאָריטעט: דער נענסטער טרעפֿ", "sort_alpha-asc": "טיטל: פֿון א ביז ת", "sort_alpha-desc": "טיטל: פֿון ת ביז א",
+    includeInSearch: "אַרײַננעמען אין זוכן", selectAll: "קלייַב אַלץ", clear: "ליידיקן",
+    noStores: "קיין קראָמען זענען נישט אַרײַנגענומען — קלייַב אויס כאָטש איין קראָם צום זוכן.",
+    storeChoicesNote: "אײַערע קראָם־קלייַבן ווערן געהאַלטן נאָר אין דעם בלעטערער.",
+    backToSearch: "צוריק צום זוכן", addTitleLabel: "לייג צו אַ טיטל צו זוכן שפּעטער",
+    addTitlePlaceholder: "למשל: מדרש רבה", addTitle: "לייג צו",
+    savedNote: "געהאַלטן אין דעם בלעטערער, און סינקראָניזירט צווישן דיווייסעס ווען איר זענט אײַנגעצייכנט.",
+    idleText: "שרײַבט אַ טיטל אויבן — אויף ענגליש אָדער העברעיִש — און דער בלאַט וועט צונויפֿזאַמלען די פּאַסיקע ליסטינגס, יעדע מיט איר דעקל און פּרײַז.",
+    footerNote: "ליסטינגס, דעקלעך און פּרײַזן קומען לעבעדיק פֿון יעדער קראָם׳ס אייגענער וועבזײַט בעת דעם זוכן. זוכן דאַרף קיין חשבון; אײַנצייכענען מיט גוגל איז פֿרײַוויליק און סינקראָניזירט נאָר אײַער ווישליסט. אײַערע קראָם־קלייַבן און לאָקאַלע ווישליסט ווערן געהאַלטן אין אײַער בלעטערער.",
+    storesIncluded: "קראָמען · {n} פֿון {total} אַרײַנגענומען",
+    save: "♡ האַלטן", saved: "♥ געהאַלטן", remove: "אַראָפּנעמען", onSale: "אויף סעיל", priceAtStore: "פּרײַז אין קראָם",
+    resultsFor: "רעזולטאַטן פֿאַר “{q}”", listingsLoadedOne: "1 ליסטינג געלאַדן", listingsLoadedOther: "{n} ליסטינגס געלאַדן",
+    alsoSearchedFor: "אויך געזוכט: ", searching: "זוכן אין {stores}…",
+    noListings: "קיין ליסטינגס האָבן נישט געפּאַסט “{q}” אין די אַרײַנגענומענע קראָמען.",
+    titlesToLookUp: "טיטלען צו זוכן שפּעטער — קליקט אויף איינעם צו זוכן אים:",
+    savedListings: "געהאַלטענע ליסטינגס:",
+    nothingSaved: "נאָך גאָרנישט געהאַלטן. קליקט ♡ האַלטן אויף אַ ליסטינג, אָדער לייגט צו אַ טיטל אויבן.",
+  },
+  es: {
+    language: "Idioma:", account: "Cuenta", wishlist: "Lista de deseos", external: "Recursos externos",
+    authNote: "Inicia sesión con Google para sincronizar tu lista de deseos entre dispositivos. Buscar sigue abierto sin iniciar sesión.",
+    signedInAs: "Sesión iniciada como", signOut: "Cerrar sesión", myWishlist: "Mi lista de deseos",
+    searchPlaceholder: "Buscar", search: "Buscar", sortBy: "Ordenar por",
+    "sort_price-asc": "Precio: de menor a mayor", "sort_price-desc": "Precio: de mayor a menor",
+    sort_priority: "Prioridad: coincidencia más cercana", "sort_alpha-asc": "Título: de la A a la Z", "sort_alpha-desc": "Título: de la Z a la A",
+    includeInSearch: "Incluir en la búsqueda", selectAll: "Seleccionar todo", clear: "Limpiar",
+    noStores: "No hay tiendas incluidas — marca al menos una para buscar.",
+    storeChoicesNote: "Tus tiendas elegidas se guardan solo en este navegador.",
+    backToSearch: "Volver a buscar", addTitleLabel: "Añade un título para buscar más tarde",
+    addTitlePlaceholder: "p. ej. midrash rabbah", addTitle: "Añadir título",
+    savedNote: "Guardado en este navegador, y sincronizado entre dispositivos cuando has iniciado sesión.",
+    idleText: "Escribe un título arriba — en inglés o en hebreo — y esta página reunirá los anuncios correspondientes, cada uno con su portada y precio.",
+    footerNote: "Los anuncios, portadas y precios llegan en vivo desde el sitio web de cada tienda al buscar. Buscar no necesita cuenta; iniciar sesión con Google es opcional y solo sincroniza tu lista de deseos. Tus tiendas elegidas y tu lista local se guardan en tu navegador.",
+    storesIncluded: "Tiendas · {n} de {total} incluidas",
+    save: "♡ Guardar", saved: "♥ Guardado", remove: "Quitar", onSale: "En oferta", priceAtStore: "Precio en tienda",
+    resultsFor: "Resultados para “{q}”", listingsLoadedOne: "1 anuncio cargado", listingsLoadedOther: "{n} anuncios cargados",
+    alsoSearchedFor: "También se buscó: ", searching: "Buscando en {stores}…",
+    noListings: "Ningún anuncio coincidió con “{q}” en las tiendas incluidas.",
+    titlesToLookUp: "Títulos para buscar más tarde — toca uno para buscarlo:",
+    savedListings: "Anuncios guardados:",
+    nothingSaved: "Aún no has guardado nada. Toca ♡ Guardar en cualquier anuncio, o añade un título arriba.",
+  },
+  fr: {
+    language: "Langue :", account: "Compte", wishlist: "Liste de souhaits", external: "Ressources externes",
+    authNote: "Connectez-vous avec Google pour synchroniser votre liste de souhaits entre appareils. La recherche reste ouverte sans connexion.",
+    signedInAs: "Connecté en tant que", signOut: "Se déconnecter", myWishlist: "Ma liste de souhaits",
+    searchPlaceholder: "Rechercher", search: "Rechercher", sortBy: "Trier par",
+    "sort_price-asc": "Prix : croissant", "sort_price-desc": "Prix : décroissant",
+    sort_priority: "Priorité : correspondance la plus proche", "sort_alpha-asc": "Titre : de A à Z", "sort_alpha-desc": "Titre : de Z à A",
+    includeInSearch: "Inclure dans la recherche", selectAll: "Tout sélectionner", clear: "Effacer",
+    noStores: "Aucune boutique incluse — cochez-en au moins une pour rechercher.",
+    storeChoicesNote: "Vos boutiques choisies sont conservées uniquement dans ce navigateur.",
+    backToSearch: "Retour à la recherche", addTitleLabel: "Ajouter un titre à rechercher plus tard",
+    addTitlePlaceholder: "p. ex. midrash rabbah", addTitle: "Ajouter un titre",
+    savedNote: "Enregistré dans ce navigateur, et synchronisé entre appareils lorsque vous êtes connecté.",
+    idleText: "Tapez un titre ci-dessus — en anglais ou en hébreu — et cette page rassemblera les annonces correspondantes, chacune avec sa couverture et son prix.",
+    footerNote: "Les annonces, couvertures et prix proviennent en direct du site de chaque boutique au moment de la recherche. La recherche ne nécessite aucun compte ; se connecter avec Google est facultatif et ne fait que synchroniser votre liste de souhaits. Vos boutiques choisies et votre liste locale sont conservées dans votre navigateur.",
+    storesIncluded: "Boutiques · {n} sur {total} incluses",
+    save: "♡ Enregistrer", saved: "♥ Enregistré", remove: "Retirer", onSale: "En solde", priceAtStore: "Prix en boutique",
+    resultsFor: "Résultats pour « {q} »", listingsLoadedOne: "1 annonce chargée", listingsLoadedOther: "{n} annonces chargées",
+    alsoSearchedFor: "Aussi recherché : ", searching: "Recherche dans {stores}…",
+    noListings: "Aucune annonce ne correspond à « {q} » dans les boutiques incluses.",
+    titlesToLookUp: "Titres à rechercher plus tard — touchez-en un pour le rechercher :",
+    savedListings: "Annonces enregistrées :",
+    nothingSaved: "Rien n'est encore enregistré. Touchez ♡ Enregistrer sur une annonce, ou ajoutez un titre ci-dessus.",
+  },
+};
+let currentLang = (() => {
+  try {
+    const saved = localStorage.getItem(LS_LANG);
+    if (saved && I18N[saved]) return saved;
+  } catch { /* default stands */ }
+  return "en";
+})();
+// Look up a UI string in the current language, falling back to English
+// for any key a translation is missing, with {name} placeholders filled.
+function t(key, vars = {}) {
+  let s = (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key;
+  for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
+  return s;
+}
+function listingsLoadedText(n) {
+  return n === 1 ? t("listingsLoadedOne") : t("listingsLoadedOther", { n });
+}
+// Apply a language to the whole page: document direction (right-to-left
+// for Hebrew/Yiddish), every tagged static string, the sort options,
+// the search button label, the switcher buttons' active state — then
+// re-render whatever view is open so dynamic strings follow too.
+function applyLanguage(lang) {
+  if (!I18N[lang]) lang = "en";
+  currentLang = lang;
+  const dir = (LANGS.find((l) => l.code === lang) || LANGS[0]).dir;
+  document.documentElement.lang = lang;
+  document.documentElement.dir = dir;
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.getAttribute("data-i18n"));
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    el.placeholder = t(el.getAttribute("data-i18n-placeholder"));
+  });
+  document.querySelectorAll("#sort-select option").forEach((opt) => {
+    opt.textContent = t(`sort_${opt.value}`);
+  });
+  const searchBtn = $("#search-btn");
+  if (searchBtn) searchBtn.setAttribute("aria-label", t("search"));
+  document.querySelectorAll("#lang-switcher [data-lang]").forEach((btn) => {
+    const active = btn.getAttribute("data-lang") === lang;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", String(active));
+  });
+  renderStoresButton();
+  renderResults();
+  if (!$("#wishlist-view").classList.contains("d-none")) renderWishlist();
+}
+function setLanguage(lang) {
+  saveLocal(LS_LANG, lang);
+  applyLanguage(lang);
+}
 // Google sign-in (Identity Services): the client id is public, not a
 // secret — the worker verifies Google's signed ID token itself, so no
 // client secret is stored anywhere. While empty, the site simply runs
@@ -168,7 +355,7 @@ function renderStoreChecks() {
 
 function renderStoresButton() {
   $("#stores-toggle-label").textContent =
-    `Stores · ${enabledStores().length} of ${STORES.length} included`;
+    t("storesIncluded", { n: enabledStores().length, total: STORES.length });
   $("#no-stores-warning").classList.toggle("d-none", enabledStores().length > 0);
   $("#search-btn").disabled = enabledStores().length === 0 || !$("#sefer-search").value.trim();
 }
@@ -182,11 +369,11 @@ function productCard(store, p, wishMode) {
       (p.compareAtText
         ? `<span class="text-secondary text-decoration-line-through small ms-2">${esc(p.compareAtText)}</span>`
         : "")
-    : `<span class="text-secondary small">Price at store</span>`;
+    : `<span class="text-secondary small">${t("priceAtStore")}</span>`;
   const saved = savedUrls().has(p.url);
   const wishBtn = wishMode === "remove"
-    ? `<button type="button" class="btn btn-sm save-btn" data-wish-url="${esc(p.url)}">Remove</button>`
-    : `<button type="button" class="btn btn-sm save-btn ${saved ? "saved" : ""}" data-wish-url="${esc(p.url)}">${saved ? "♥ Saved" : "♡ Save"}</button>`;
+    ? `<button type="button" class="btn btn-sm save-btn" data-wish-url="${esc(p.url)}">${t("remove")}</button>`
+    : `<button type="button" class="btn btn-sm save-btn ${saved ? "saved" : ""}" data-wish-url="${esc(p.url)}">${saved ? t("saved") : t("save")}</button>`;
   const img = p.imageUrl
     ? `<img src="${esc(p.imageUrl)}" alt="${esc(p.title)}" loading="lazy"
             class="w-100 product-img" onerror="this.outerHTML=window.__sspFallbackImg">`
@@ -195,7 +382,7 @@ function productCard(store, p, wishMode) {
     <div class="col">
       <div class="card h-100 shadow-sm position-relative product-card">
         <div class="p-2 pb-0">
-          <div class="rounded product-img-wrap position-relative">${img}${p.compareAtText ? `<span class="sale-stamp">On sale</span>` : ""}</div>
+          <div class="rounded product-img-wrap position-relative">${img}${p.compareAtText ? `<span class="sale-stamp">${t("onSale")}</span>` : ""}</div>
         </div>
         <div class="card-body d-flex flex-column pt-2">
           <p class="store-badge mb-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><path d="M9 21V13h6v8"/></svg>${esc(store.name)}</p>
@@ -225,10 +412,10 @@ function renderResults() {
   const extraVariants = activeVariants.filter((v) => v !== activeQuery.toLowerCase());
   let html = `
     <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 pb-2 results-rule">
-      <h2 class="font-display fw-semibold mb-0 results-title">Results for “${esc(activeQuery)}”</h2>
-      ${anyLoading ? "" : `<p class="text-secondary small mb-0">${total} listing${total === 1 ? "" : "s"} loaded</p>`}
+      <h2 class="font-display fw-semibold mb-0 results-title">${t("resultsFor", { q: esc(activeQuery) })}</h2>
+      ${anyLoading ? "" : `<p class="text-secondary small mb-0">${listingsLoadedText(total)}</p>`}
     </div>
-    ${extraVariants.length ? `<p class="text-secondary small mb-0">Also searched for: ${extraVariants.map((v) => `“${esc(v)}”`).join(", ")}</p>` : ""}
+    ${extraVariants.length ? `<p class="text-secondary small mb-0">${t("alsoSearchedFor")}${extraVariants.map((v) => `“${esc(v)}”`).join(", ")}</p>` : ""}
     ${WORKER_URL ? "" : `<p class="text-secondary small mb-0">Fetching back-end not yet configured — results load directly from each store where the browser allows it. See README for the worker setup.</p>`}`;
 
   // One merged grid: products from every store are sorted together
@@ -239,7 +426,7 @@ function renderResults() {
     html += `
       <div class="mt-3 d-flex align-items-center gap-2 text-secondary">
         <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-        <span>Searching ${loadingStores.map((s) => esc(s.name)).join(", ")}…</span>
+        <span>${t("searching", { stores: loadingStores.map((s) => esc(s.name)).join(", ") })}</span>
       </div>`;
   }
   // Stores with no listings are simply left out — no error or empty
@@ -262,7 +449,7 @@ function renderResults() {
     html += `<div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-1">` +
       sorted.map((p) => productCard(byProduct.get(p), p)).join("") + `</div>`;
   } else if (!anyLoading) {
-    html += `<p class="mt-3 p-3 rounded text-secondary empty-box">No listings matched “${esc(activeQuery)}” at the included stores.</p>`;
+    html += `<p class="mt-3 p-3 rounded text-secondary empty-box">${t("noListings", { q: esc(activeQuery) })}</p>`;
   }
   section.innerHTML = html;
 }
@@ -364,7 +551,7 @@ function renderWishlist() {
   const titlesWrap = $("#wish-titles");
   const itemsWrap = $("#wish-items");
   titlesWrap.innerHTML = wishlist.titles.length
-    ? `<p class="text-secondary small mb-2">Titles to look up later — tap one to search it:</p>` +
+    ? `<p class="text-secondary small mb-2">${t("titlesToLookUp")}</p>` +
       wishlist.titles.map((t) => `
         <div class="wish-title-row d-flex justify-content-between align-items-center gap-2 px-3 py-2 mb-2">
           <button type="button" class="btn p-0 text-start fw-medium flex-grow-1" data-wish-title="${esc(t)}">${esc(t)}</button>
@@ -377,11 +564,11 @@ function renderWishlist() {
       productByUrl.set(i.url, { product: i, store });
       return productCard(store, i, "remove");
     }).join("");
-    itemsWrap.innerHTML = `<p class="text-secondary small mb-2">Saved listings:</p><div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">${cards}</div>`;
+    itemsWrap.innerHTML = `<p class="text-secondary small mb-2">${t("savedListings")}</p><div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">${cards}</div>`;
   } else {
     itemsWrap.innerHTML = wishlist.titles.length
       ? ""
-      : `<p class="text-secondary mb-0">Nothing saved yet. Tap ♡ Save on any listing, or add a title above.</p>`;
+      : `<p class="text-secondary mb-0">${t("nothingSaved")}</p>`;
   }
   renderWishlistCount();
 }
@@ -500,6 +687,13 @@ document.addEventListener("DOMContentLoaded", () => {
       a.addEventListener("click", closeNavPanel);
     });
   }
+
+  // Footer language switcher: each button picks a language, which is
+  // remembered in this browser and applied on the next visit too.
+  document.querySelectorAll("#lang-switcher [data-lang]").forEach((btn) => {
+    btn.addEventListener("click", () => setLanguage(btn.getAttribute("data-lang")));
+  });
+  applyLanguage(currentLang);
 
   renderStoreChecks();
   renderWishlistCount();

@@ -67,6 +67,18 @@ body {
 .site-header { position: sticky; top: 0; z-index: 1030; background-color: var(--bg); }
 .site-header .container-fluid { position: relative; }
 .site-header .navbar-brand { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+/* Desktop search bar: on a wide screen the full-width bar looks
+   untidy, so from the medium breakpoint up it is capped and centred
+   instead. Phones keep the full-width bar (the media query does not
+   apply there). margin-inline keeps it centred in both left-to-right
+   and right-to-left languages. */
+@media (min-width: 768px) {
+  #search-form { max-width: 620px; margin-inline: auto; }
+}
+/* Language switcher (footer): plain outline buttons; the active one
+   takes the navy fill so the current language is obvious at a glance. */
+.lang-btn { border: 1px solid var(--line); background-color: var(--surface); color: var(--ink); }
+.lang-btn.active { background-color: var(--navy); border-color: var(--navy); color: var(--surface); }
 .navbar-toggler { border-color: var(--line); }
 .navbar-toggler:focus { box-shadow: 0 0 0 0.2rem rgba(29, 42, 91, 0.15); }
 @media (prefers-color-scheme: dark) {
