@@ -47,17 +47,20 @@
 // - Per-store behaviour, in one place (details live beside the code):
 //   at most 100 listings per store; Magento stores take one request
 //   with product_list_limit=100; OpenCart and Shopify stores are
-//   fetched page by page in parallel; SeforimPlace needs a plain
-//   "Mozilla/5.0" agent AND an AJAX header on later pages; eSicha's
-//   API serves 10 listings per page, so pages 1-10 are fetched;
-//   Greenfield is bot-blocked and is meant to come back as an error,
-//   never as invented listings.
+//   fetched page by page in parallel; eSicha's API serves 10 listings
+//   per page, so pages 1-10 are fetched; Greenfield is bot-blocked
+//   and is meant to come back as an error, never as invented listings.
+// - SAFE MODE (2026-10-28): Eichler's is NOT in the store list — its
+//   robots.txt disallows its search route (/catalogsearch/), so it is
+//   not fetched. Every store is fetched with the same identified
+//   agent below (SeforimSearch/1.0); no plain-agent workaround is
+//   used, so a store that answers a bot-check page (SeforimPlace
+//   does, for non-browser agents) simply returns no listings and is
+//   omitted, rather than being worked around.
 
 const enc = (q) => encodeURIComponent(q);
 
 const STORES = [
-  { id: "eichlers", name: "Eichler's", parser: "magento",
-    searchUrl: (q) => `https://www.eichlers.com/catalogsearch/result/?q=${enc(q)}` },
   { id: "feldheim", name: "Feldheim", parser: "magento",
     searchUrl: (q) => `https://www.feldheim.com/catalogsearch/result/?q=${enc(q)}` },
   { id: "zberman", name: "Z. Berman Books", parser: "magento",
@@ -76,8 +79,7 @@ const STORES = [
 
 // Per-store cap for one search: up to 100 listings. How a store gets there
 // differs — see pageUrlsFor: Magento takes a single request with a big
-// page size (verified: product_list_limit=12 shrinks Eichler's results to
-// 12, =100 returns all 60 for "shut"), while OpenCart ignores its limit
+// page size (product_list_limit=100), while OpenCart ignores its limit
 // parameter entirely (SeforimPlace returns 20/page whatever limit is
 // asked) and WooCommerce's API fixes its page at 10, so those stores are
 // fetched page by page, in parallel, instead of one slow sequence.
@@ -347,8 +349,8 @@ function parseForStore(store, text) {
 // ---------------------------------------------------------------------------
 // Fetching: which URL(s) to ask each store for, and how the results from
 // several pages are merged. See the per-store notes in extraPageUrls
-// and fetchStoreText — those two functions hold the tricks that make
-// each store return more than its first page.
+// and fetchStoreText — those two functions hold the paging logic that
+// lets each store return more than its first page.
 // ---------------------------------------------------------------------------
 function targetUrlFor(store, query) {
   if (store.parser === "wooStoreApi") {
@@ -360,12 +362,11 @@ async function fetchStoreText(store, url, ajax = false) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 20000);
   try {
-    // Eichler's WAF blocks desktop Chrome user-agents (403) while
-    // accepting a plain generic agent from the same IP, so it gets one.
-    // SeforimPlace does the same (desktop Chrome UA gets a 547-byte
-    // bot-check page; a plain agent gets the real ~315KB search page).
-    const ua = (store.id === "eichlers" || store.id === "seforimplace") ? "Mozilla/5.0" : UA;
-    const headers = { "User-Agent": ua, "Accept": "text/html,application/json,*/*", "Accept-Language": "en-US,en;q=0.9" };
+    // SAFE MODE: every store gets the same identified agent (UA above).
+    // No plain-agent workaround: SeforimPlace answers non-browser
+    // agents with a bot-check page, and that answer is accepted — it
+    // yields no listings and the store is omitted, not worked around.
+    const headers = { "User-Agent": UA, "Accept": "text/html,application/json,*/*", "Accept-Language": "en-US,en;q=0.9" };
     // Journal (SeforimPlace) only honours the page parameter on AJAX
     // requests — its infinite scroll loads later pages that way. A plain
     // fetch of &page=2 returns page 1 again; with X-Requested-With it
@@ -405,7 +406,7 @@ function mergeAcrossPages(lists) {
 async function searchStoreWorker(store, query) {
   const base = { storeId: store.id, storeName: store.name, searchUrl: store.searchUrl(query) };
   // Magento gets one big request instead of paging: its limit parameter
-  // is honoured (verified on Eichler's).
+  // is honoured by the Magento stores.
   const firstUrl = store.parser === "magento"
     ? `${store.searchUrl(query)}&product_list_limit=${MAX_PER_STORE}`
     : targetUrlFor(store, query);

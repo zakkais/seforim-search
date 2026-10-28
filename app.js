@@ -34,12 +34,6 @@
 var enc = (q) => encodeURIComponent(q);
 var STORES = [
   {
-    id: "eichlers",
-    name: "Eichler's",
-    parser: "magento",
-    searchUrl: (q) => `https://www.eichlers.com/catalogsearch/result/?q=${enc(q)}`
-  },
-  {
     id: "feldheim",
     name: "Feldheim",
     parser: "magento",

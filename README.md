@@ -1,11 +1,17 @@
 # Seforim Search (public) — static site
 
 One search box that shows the actual product listings — cover, title, and
-price — from eight seforim stores, sorted together in one merged grid
+price — from seven seforim stores, sorted together in one merged grid
 (each card still carries its store badge):
 
-Eichler's · Feldheim · Z. Berman Books · SeforimDeals · SeforimPlace ·
+Feldheim · Z. Berman Books · SeforimDeals · SeforimPlace ·
 Hamafitz · Greenfield Judaica · eSicha
+
+SAFE MODE (2026-10-28): Eichler's was removed because its robots.txt
+disallows its search route (/catalogsearch/), and no bot-wall workaround
+is used anywhere — a store that answers a bot-check page is accepted as
+an error and omitted, not worked around. That currently leaves
+SeforimPlace returning no listings (it bot-checks non-browser agents).
 
 Clicking a listing opens it on the store's own product page. Filters:
 per-store include/exclude checkboxes and sorting (price low→high /
@@ -122,24 +128,20 @@ results and parses the listings out of the response. Up to **100
 listings per store** are returned. How a store gets there differs, and
 each trick is commented beside the code that uses it:
 
-- **Magento stores (Eichler's, Feldheim, Z. Berman):** one request
-  with `product_list_limit=100`. That parameter is honoured (verified:
-  `=12` shrinks Eichler's results to 12, `=100` returns all 60 "shut"
-  matches in one request).
+- **Magento stores (Feldheim, Z. Berman):** one request
+  with `product_list_limit=100`.
 - **OpenCart stores (SeforimPlace, Hamafitz) and Shopify
   (SeforimDeals):** the search is fetched page by page, in parallel
   (pages 1–5), and merged with duplicates removed. OpenCart ignores
   its `limit` parameter, so paging is the only way past its 20-per-page
   first page.
-- **SeforimPlace in particular** needs two things a plain fetch does
-  not do on its own: a plain `Mozilla/5.0` user-agent (desktop Chrome
-  agents get a 547-byte bot-check page, while the plain agent gets the
-  real search page), and an `X-Requested-With: XMLHttpRequest` header
-  on pages 2 and later — its theme only honours the page number on
-  AJAX requests (its infinite scroll loads that way), so a plain fetch
-  of `&page=2` returns page 1 again, while the AJAX-headed one
-  correctly returns products 21–40. Eichler's needs the plain
-  user-agent too (its firewall blocks desktop Chrome agents).
+- **SeforimPlace in particular:** its theme only honours the page
+  number on AJAX requests (its infinite scroll loads that way), so
+  pages 2 and later are fetched with an `X-Requested-With:
+  XMLHttpRequest` header. Under safe mode the store is fetched with
+  the same identified agent as every other store, and it currently
+  answers non-browser agents with a bot-check page — that answer is
+  accepted as an error and the store is omitted, not worked around.
 - **eSicha (WooCommerce product API):** the API fixes its page at 10
   listings (95 total for "tanya"), so pages 1–10 are fetched in
   parallel.
