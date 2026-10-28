@@ -47,7 +47,14 @@ const STORES = [
     searchUrl: (q) => `https://www.esicha.org/?s=${enc(q)}` },
 ];
 
-const MAX_PER_STORE = 24;
+// Per-store cap for one search: up to 100 listings. How a store gets there
+// differs — see pageUrlsFor: Magento takes a single request with a big
+// page size (verified: product_list_limit=12 shrinks Eichler's results to
+// 12, =100 returns all 60 for "shut"), while OpenCart ignores its limit
+// parameter entirely (SeforimPlace returns 20/page whatever limit is
+// asked) and WooCommerce's API fixes its page at 10, so those stores are
+// fetched page by page, in parallel, instead of one slow sequence.
+const MAX_PER_STORE = 100;
 const CACHE_TTL_SECONDS = 600; // 10 minutes
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 SeforimSearch/1.0";
 
@@ -304,8 +311,7 @@ function targetUrlFor(store, query) {
   }
   return store.searchUrl(query);
 }
-async function fetchStoreText(store, query) {
-  const url = targetUrlFor(store, query);
+async function fetchStoreText(store, url, ajax = false) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 20000);
   try {
@@ -314,9 +320,15 @@ async function fetchStoreText(store, query) {
     // SeforimPlace does the same (desktop Chrome UA gets a 547-byte
     // bot-check page; a plain agent gets the real ~315KB search page).
     const ua = (store.id === "eichlers" || store.id === "seforimplace") ? "Mozilla/5.0" : UA;
+    const headers = { "User-Agent": ua, "Accept": "text/html,application/json,*/*", "Accept-Language": "en-US,en;q=0.9" };
+    // Journal (SeforimPlace) only honours the page parameter on AJAX
+    // requests — its infinite scroll loads later pages that way. A plain
+    // fetch of &page=2 returns page 1 again; with X-Requested-With it
+    // correctly returns "Showing 21 to 40" (verified against a real
+    // browser, whose page 2 starts with Shut Chacham Tzvi).
+    if (ajax) headers["X-Requested-With"] = "XMLHttpRequest";
     const res = await fetch(url, {
-      signal: ctrl.signal, redirect: "follow",
-      headers: { "User-Agent": ua, "Accept": "text/html,application/json,*/*", "Accept-Language": "en-US,en;q=0.9" },
+      signal: ctrl.signal, redirect: "follow", headers,
     });
     if (!res.ok) return { ok: false, httpStatus: res.status, text: null };
     return { ok: true, httpStatus: res.status, text: await res.text() };
@@ -324,9 +336,35 @@ async function fetchStoreText(store, query) {
     return { ok: false, httpStatus: null, text: null, error: String(e?.name ?? e) };
   } finally { clearTimeout(t); }
 }
+// Extra page URLs beyond page 1, or null when one request already covers
+// the store (Magento's product_list_limit, or a blocked/single-page store).
+function extraPageUrls(store, query) {
+  if (store.parser === "magento" || store.parser === "volusion") return null;
+  if (store.parser === "wooStoreApi") {
+    const base = targetUrlFor(store, query);
+    return Array.from({ length: 9 }, (_, i) => `${base}&page=${i + 2}`);
+  }
+  const base = store.searchUrl(query);
+  return [2, 3, 4, 5].map((p) => `${base}&page=${p}`);
+}
+function mergeAcrossPages(lists) {
+  const seen = new Set(); const out = [];
+  for (const list of lists) for (const p of list) {
+    const key = p.url || p.title;
+    if (seen.has(key)) continue;
+    seen.add(key); out.push(p);
+    if (out.length >= MAX_PER_STORE) return out;
+  }
+  return out;
+}
 async function searchStoreWorker(store, query) {
   const base = { storeId: store.id, storeName: store.name, searchUrl: store.searchUrl(query) };
-  const got = await fetchStoreText(store, query);
+  // Magento gets one big request instead of paging: its limit parameter
+  // is honoured (verified on Eichler's).
+  const firstUrl = store.parser === "magento"
+    ? `${store.searchUrl(query)}&product_list_limit=${MAX_PER_STORE}`
+    : targetUrlFor(store, query);
+  const got = await fetchStoreText(store, firstUrl);
   if (!got.ok) {
     return { ...base, status: "error",
       message: `${store.name} could not be reached right now${got.httpStatus ? ` (HTTP ${got.httpStatus})` : ""}. You can open its own search results instead.`, products: [] };
@@ -337,6 +375,19 @@ async function searchStoreWorker(store, query) {
       message: `${store.name} is showing a bot-check page right now, so its listings can't be loaded here. You can open its own search results instead.`, products: [] };
   }
   let products = parseForStore(store, text);
+  // Remaining pages are fetched in parallel, not one after another, so
+  // gathering up to 100 listings costs roughly one page-fetch of time.
+  const extra = extraPageUrls(store, query);
+  if (extra && products.length > 0) {
+    const pages = await Promise.all(extra.map(async (url) => {
+      try {
+        const r = await fetchStoreText(store, url, store.parser === "opencartJournal");
+        if (!r.ok || looksBotWalled(r.text ?? "")) return [];
+        return parseForStore(store, r.text ?? "");
+      } catch { return []; }
+    }));
+    products = mergeAcrossPages([products, ...pages]);
+  }
   if (products.length === 0 && store.parser === "shopify") {
     const suggestUrl = `https://seforimdeals.com/search/suggest.json?q=${enc(query)}&resources%5Btype%5D=product&resources%5Blimit%5D=10`;
     try {

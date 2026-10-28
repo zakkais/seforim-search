@@ -51,7 +51,7 @@ var STORES = [
     searchUrl: (q) => `https://www.esicha.org/?s=${enc(q)}`
   }
 ];
-var MAX_PER_STORE = 24;
+var MAX_PER_STORE = 100;
 // ---------------------------------------------------------------------------
 // Fetching back-end (Cloudflare Worker). Deploy worker.js (see README.md)
 // and put its URL here, e.g. "https://seforim-search.<you>.workers.dev".

@@ -5,7 +5,7 @@
 // no tracking — sign-in, when it lands, will sync this same wishlist
 // (items keyed by product URL, plus title-only entries) per user.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./app.js";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./app.js?v=2";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
