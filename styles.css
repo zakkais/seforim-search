@@ -1,4 +1,17 @@
-/* Seforim Search — bookshop theme on top of Bootstrap 5. */
+/* Seforim Search — bookshop theme on top of Bootstrap 5.
+ *
+ * What this file does: it paints the page (warm paper colours, the
+ * Spectral display font, product cards, the sale stamp, wishlist
+ * buttons) on top of Bootstrap's layout and components. It contains no
+ * behaviour — everything clickable is wired up in ui.js.
+ *
+ * How to edit it safely: change colours in the :root block below and
+ * they flow through the whole page (including the dark-mode block that
+ * follows it). Class names here must match index.html and the markup
+ * built in ui.js — renaming a class here without renaming it there
+ * silently unstyles that element. If a class is no longer used by
+ * either file, delete it here rather than leaving it to confuse the
+ * next reader. */
 
 :root {
   --bg: #f6f2ea;
@@ -65,9 +78,7 @@ body {
 .save-btn.saved { color: var(--rust); font-weight: 600; }
 .wish-title-row { border: 1px solid var(--line); background-color: var(--surface); border-radius: 8px; }
 
-.hero-title { font-size: 2.1rem; line-height: 1.15; }
-.hero-lead { max-width: 620px; font-size: 1.02rem; }
-
+/* Search box and buttons. */
 .search-input {
   background-color: var(--surface);
   color: var(--ink);
@@ -106,12 +117,7 @@ body {
 }
 .sort-select:focus { border-color: var(--navy); box-shadow: 0 0 0 0.2rem rgba(29, 42, 91, 0.15); }
 
-.example-chip {
-  border: 1px solid var(--line);
-  background-color: var(--surface);
-  color: var(--ink);
-}
-
+/* Cards, panels, and result headings. */
 .card { background-color: var(--surface); border-color: var(--line); }
 .panel-title { font-size: 1.25rem; }
 
@@ -124,9 +130,9 @@ body {
 
 .results-rule { border-bottom: 2px solid var(--navy); }
 .results-title { font-size: 1.6rem; }
-.store-name { font-size: 1.3rem; }
-.store-link { color: var(--navy); }
 
+/* Product cards: the cover, the store badge, the title (clamped to
+   three lines), the "On sale" stamp, and the price. */
 .product-card { background-color: var(--surface); border-color: var(--line); }
 .product-img-wrap { background-color: var(--surface-alt); }
 .product-img { height: 150px; object-fit: contain; }
@@ -169,12 +175,8 @@ body {
   .price { color: var(--gold); }
 }
 
-.error-box { border: 1px solid var(--rust); background-color: var(--surface); }
-.open-store-btn {
-  border: 1px solid var(--line);
-  background-color: var(--surface-alt);
-  color: var(--ink);
-}
+/* Empty-results note (stores with no listings are otherwise left out
+   of the grid entirely, with no per-store notice). */
 .empty-box { border: 1px solid var(--line); background-color: var(--surface); }
 
 .idle-box { border: 1px solid var(--line); background-color: var(--surface); }

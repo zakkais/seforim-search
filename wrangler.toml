@@ -1,3 +1,15 @@
+# Seforim Search — Cloudflare Worker settings (reference only).
+#
+# NOTE: the live worker is NOT deployed from this file. It is uploaded
+# through the Cloudflare API (see README.md, "Deploy the fetching
+# worker"), which sets two bindings this file does not contain:
+#   - a KV namespace bound as SEFORIM_KV (sign-in sessions and server
+#     wishlists), and
+#   - a plain-text variable GOOGLE_CLIENT_ID (the public Google client
+#     id; never a client secret — sign-in needs none).
+# Deploying from this file alone would therefore leave sign-in broken
+# ("not configured") while search still worked. Keep this file only so
+# the project shape is standard; do not treat it as the deploy path.
 name = "seforim-search"
 main = "worker.js"
 compatibility_date = "2026-10-27"

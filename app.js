@@ -1,4 +1,36 @@
-// workspace/ts-spaces/seforim-search-public/client/src/stores.ts
+// Seforim Search — store library (runs in the visitor's browser).
+//
+// What this file does: it knows the eight stores (their search URLs and
+// which page layout each one uses), turns a store's search page into
+// product listings, expands a search into alternate transliterations
+// (midrash/medrash, mishnah/mishna, ...), merges results across stores
+// and spelling variants, and sorts them. ui.js imports it and renders
+// what it returns. It has no dependencies of its own — plain browser
+// JavaScript, no build step.
+//
+// HOW TO EDIT THIS FILE (read before changing anything):
+// - INTENTIONAL DUPLICATION: the store list (STORES) and the store
+//   parsers below are copied in worker.js as well. That is not an
+//   accident to clean up: worker.js is the server-side fetcher the live
+//   site normally uses, and this file is the direct-browser fallback
+//   the page uses when the worker cannot be reached. The worker copy
+//   is authoritative for live site searches; this copy is authoritative
+//   for that fallback. If you change a store's search URL or a parser,
+//   change it in BOTH files, and keep MAX_PER_STORE the same in both,
+//   or the page will trim the worker's results.
+// - To add or fix a store, edit STORES and, if its page layout is new,
+//   add a parser and a case in parseForStore (and the same in
+//   worker.js). To change how far a search goes, change MAX_PER_STORE
+//   (currently 100 listings per store) in both files.
+// - Do not touch WORKER_URL casually: it must point at the deployed
+//   worker, with no trailing slash. While it is empty, the page falls
+//   back to direct browser fetching, which most stores block.
+//
+// What each listing looks like everywhere in this project:
+// { title, url, priceText, priceAmount, compareAtText, imageUrl }
+// (priceText/compareAtText are display strings like "$41.00";
+// priceAmount is the number used for sorting, or null when the store
+// shows no price.)
 var enc = (q) => encodeURIComponent(q);
 var STORES = [
   {
@@ -70,63 +102,63 @@ var VARIANT_GROUPS = [
   ["chumash", "humash", "chumosh", "chumashim"],
   ["gemara", "gemorah", "gemora", "gemaros"],
   ["talmud", "talmudic"],
-  ["halacha", "halacha", "halachos", "halakha", "halakhot", "halochos", "halochah"],
+  ["halacha", "halachos", "halakha", "halakhot", "halochos", "halochah"],
   ["tefillah", "tefila", "tefillot", "tefilos"],
-  ["siddur", "siddurim", "siddurim"],
-  ["machzor", "machzorim", "machzorim"],
-  ["sefer", "seforim", "seferim", "sefer"],
-  ["shulchan", "shulchan"],
+  ["siddur", "siddurim"],
+  ["machzor", "machzorim"],
+  ["sefer", "seforim", "seferim"],
+  ["shulchan"],
   ["aruch", "oruch", "arukh"],
-  ["rashi", "rashi"],
-  ["rambam", "rambam"],
-  ["tanya", "tanya"],
+  ["rashi"],
+  ["rambam"],
+  ["tanya"],
   ["kabbalah", "kabbala", "kabala"],
   ["mussar", "musar"],
   ["aggadah", "agada", "aggada", "aggadot"],
-  ["berurah", "berura", "berurah"],
+  ["berurah", "berura"],
   ["brachot", "brochos", "brachos", "berachot", "berachos"],
-  ["shabbos", "shabbat", "shabbath", "shabbos"],
+  ["shabbos", "shabbat", "shabbath"],
   ["pesach", "passover", "pesah"],
   ["sukkah", "succah", "sukkot", "succos"],
-  ["tehillim", "tehilim", "tehillim"],
+  ["tehillim", "tehilim"],
   ["nach", "tanach", "tanakh"],
   ["avot", "avos", "pirkei avot", "pirkei avos"],
-  ["yom", "yom"],
+  ["yom"],
   ["kiddush", "kidush"],
   ["taharah", "tahara", "taharos"],
   ["tzitzit", "tzitzis", "tzitzith"],
   ["mezuzah", "mezuza", "mezuzot"],
   ["chanukah", "hanukkah", "chanuka", "hanuka"],
-  ["purim", "purim"],
-  ["rosh", "rosh"],
-  ["hashanah", "hashana", "hashanah"],
-  ["kippur", "kippur"],
+  ["purim"],
+  ["rosh"],
+  ["hashanah", "hashana"],
+  ["kippur"],
   ["mishneh", "mishne", "mishneh torah"],
-  ["torah", "torah", "tora"],
-  ["neviim", "neviim", "neviim"],
-  ["kesuvim", "kesuvim", "ksuvim"],
-  ["parsha", "parsha", "parshah", "parshas", "parshat"],
-  ["rebbe", "rebbe", "rebbi"],
+  ["torah", "tora"],
+  ["neviim"],
+  ["kesuvim", "ksuvim"],
+  ["parsha", "parshah", "parshas", "parshat"],
+  ["rebbe", "rebbi"],
   ["tzaddik", "tzadik", "tzaddikim", "tzadikim"],
   ["chassidus", "hasidus", "chassidut", "chasidus"],
-  ["likkutei", "likutei", "likkutey", "likkutei"],
-  ["sichos", "sichot", "sichos"],
-  ["shul", "shul"],
+  ["likkutei", "likutei", "likkutey"],
+  ["sichos", "sichot"],
+  ["shul"],
   ["minhag", "minhog", "minhagim", "minhogim"],
   ["mitzvah", "mitzva", "mitzvot", "mitzvos"],
-  ["yeshiva", "yeshivah", "yeshiva"],
+  ["yeshiva", "yeshivah"],
   ["rabbi", "rav", "rebbe"],
   ["gaon", "goan"],
-  ["kitzur", "kitzur"],
-  ["orech", "orech"],
+  ["kitzur"],
+  ["orech"],
   ["chayim", "chaim", "hayim"],
-  ["ohr", "or", "ohr"],
-  ["zohar", "zohar"],
+  ["ohr", "or"],
+  ["zohar"],
   ["taanit", "taanis", "taanith"],
   ["megillah", "megila", "megillas", "megilot"],
-  ["esther", "esther"],
-  ["daniel", "daniel"],
-  ["ezra", "ezra"],
+  ["esther"],
+  ["daniel"],
+  ["ezra"],
   ["nechemiah", "nechemia", "nehemiah"],
 ];
 function variantMap() {
@@ -230,9 +262,17 @@ function imgFromTag(tag) {
 function looksBotWalled(html) {
   return html.includes("/.within.website/") || html.includes("Making sure you") || html.includes("Just a moment...") || html.includes("cf-challenge") || html.includes("Attention Required! | Cloudflare") || html.includes("sessionStorage.IoI");
 }
+// ---------------------------------------------------------------------------
+// One parser per store platform (the same set as in worker.js — see the
+// duplication note at the top). Each turns a store's search page (or,
+// for eSicha, its product API JSON) into the shared listing shape above.
+// A parser returning [] does not mean "no such sefer" — it can also mean
+// the store changed its page layout, in which case this is the place
+// that needs updating (and the matching parser in worker.js too).
+// ---------------------------------------------------------------------------
 function parseMagento(html) {
   const products = [];
-  const seen = new Set;
+  const seen = new Set();
   const anchorRe = /<a\b[^>]*>([\s\S]*?)<\/a>/g;
   for (const m of html.matchAll(anchorRe)) {
     if (products.length >= MAX_PER_STORE)
@@ -296,7 +336,7 @@ function parseMagento(html) {
 }
 function parseShopify(html) {
   const products = [];
-  const seen = new Set;
+  const seen = new Set();
   const blocks = html.split(/<div class="product-item\s/);
   for (const block of blocks.slice(1)) {
     if (products.length >= MAX_PER_STORE)
@@ -362,7 +402,7 @@ function parseShopifySuggest(raw) {
 function parseOpencartJournal(html) {
   const clean = html.replace(/<style[\s\S]*?<\/style>/g, "").replace(/<script[\s\S]*?<\/script>/g, "");
   const products = [];
-  const seen = new Set;
+  const seen = new Set();
   for (const seg of clean.split(/class="product-layout/)) {
     if (products.length >= MAX_PER_STORE)
       break;
@@ -423,7 +463,7 @@ function parseOpencartJournal(html) {
 }
 function parseOpencartClassic(html) {
   const products = [];
-  const seen = new Set;
+  const seen = new Set();
   const segments = html.split(/class="product-thumb/);
   for (const seg of segments.slice(1)) {
     if (products.length >= MAX_PER_STORE)
@@ -481,7 +521,7 @@ function parseOpencartClassic(html) {
 }
 function parseVolusion(html) {
   const products = [];
-  const seen = new Set;
+  const seen = new Set();
   const anchorRe = /<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
   for (const m of html.matchAll(anchorRe)) {
     if (products.length >= MAX_PER_STORE)
@@ -555,8 +595,14 @@ function parseWooStoreApi(raw) {
   }
   return products;
 }
+// ---------------------------------------------------------------------------
+// Searching: try the worker first (it fetches server-side, so no browser
+// CORS block), and fall back to reading the store directly from the
+// browser when the worker is missing or fails. Either way, results from
+// all spelling variants are merged and deduplicated by product URL.
+// ---------------------------------------------------------------------------
 async function fetchViaChain(url) {
-  const ctrl = new AbortController;
+  const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 15000);
   try {
     const res = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
@@ -661,6 +707,12 @@ async function searchStore(store, query, variantQueries) {
   }
   return { ...base, status: "ok", message: null, products: merged };
 }
+// ---------------------------------------------------------------------------
+// Sorting. Price and title sorts are straightforward; "Priority: closest
+// match" is explained on priorityScore itself — read that comment before
+// changing the ranking, because small changes there reorder every
+// search's results.
+// ---------------------------------------------------------------------------
 function normWords(s) {
   return String(s || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(/\s+/).filter(Boolean);
 }

@@ -1,19 +1,41 @@
-// Seforim Search (public) — static UI.
-// All searching happens in the visitor's browser (see app.js for the store
-// parsers and fetch chain). Store selections, the sort choice, and the
-// wishlist are kept in localStorage only. No accounts yet, no checkout,
-// no tracking — sign-in, when it lands, will sync this same wishlist
-// (items keyed by product URL, plus title-only entries) per user.
+// Seforim Search — page logic (runs in the visitor's browser).
+//
+// What this file does: it renders the page (store checkboxes, the merged
+// results grid, the wishlist view), runs searches through app.js, and
+// wires up the optional Google sign-in. Searching itself, the store
+// list, the spelling variants, and the sorting all live in app.js —
+// this file only calls them and draws what they return.
+//
+// What it depends on — do not rename casually:
+// - Every element id used here (sefer-search, search-form, sort-select,
+//   stores-panel, store-checks, results, wishlist-view, nav-panel, ...)
+//   must match index.html, or that control silently stops working.
+// - The import above must keep pointing at app.js (with its ?v=
+//   version, so visitors get a fresh copy when app.js changes).
+// - GOOGLE_CLIENT_ID below is public, not a secret — but it must match
+//   the client id the worker was deployed with, or sign-in fails.
+//   Never put a client secret in this file: sign-in needs none (the
+//   worker verifies Google's signed ID token itself).
+//
+// What is kept where: store choices, the sort choice, and the wishlist
+// live in this browser's localStorage (keys below). When the visitor
+// signs in with Google, the wishlist is also synced to the worker,
+// which merges the browser copy with the server copy (see
+// syncWishlistFromServer) — so signing in never wipes a local list.
+// Searching stays open without signing in, and there is no checkout
+// and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./app.js?v=2";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./app.js?v=3";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
 const LS_WISHLIST = "ssp:wishlist";
 // Google sign-in (Identity Services): the client id is public, not a
 // secret — the worker verifies Google's signed ID token itself, so no
-// client secret is stored anywhere. Filled in once Zakkai creates the
-// OAuth client; while empty, the site simply runs signed-out.
+// client secret is stored anywhere. While empty, the site simply runs
+// signed-out; while the Google app is in Testing mode, only its listed
+// test users can sign in (opening sign-in to everyone is a separate,
+// later step — publishing the app for Google's verification).
 const GOOGLE_CLIENT_ID = "891019147469-gbo84i1ugleie3sa0mrrccje77uv3ko6.apps.googleusercontent.com";
 const $ = (sel) => document.querySelector(sel);
 
@@ -364,13 +386,22 @@ function renderWishlist() {
   renderWishlistCount();
 }
 
+// Close the hamburger menu panel (Bootstrap collapse when available,
+// plain class removal otherwise). Used both when a nav link is tapped
+// and when the wishlist view opens from the menu.
+function closeNavPanel() {
+  const panel = document.getElementById("nav-panel");
+  if (!panel) return;
+  if (window.bootstrap) window.bootstrap.Collapse.getOrCreateInstance(panel).hide();
+  else panel.classList.remove("show");
+}
+
 function showWishlist() {
   renderWishlist();
   $("#results").classList.add("d-none");
   $("#idle-state").classList.add("d-none");
   $("#wishlist-view").classList.remove("d-none");
-  const panel = document.getElementById("nav-panel");
-  if (panel && window.bootstrap) window.bootstrap.Collapse.getOrCreateInstance(panel).hide();
+  closeNavPanel();
 }
 
 function showSearchView() {
@@ -466,13 +497,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const navPanelEl = document.getElementById("nav-panel");
   if (navPanelEl) {
     navPanelEl.querySelectorAll("a").forEach((a) => {
-      a.addEventListener("click", () => {
-        if (window.bootstrap) {
-          window.bootstrap.Collapse.getOrCreateInstance(navPanelEl).hide();
-        } else {
-          navPanelEl.classList.remove("show");
-        }
-      });
+      a.addEventListener("click", closeNavPanel);
     });
   }
 

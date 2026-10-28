@@ -25,6 +25,33 @@
 //
 // Deploy: see README.md ("Deploy the fetching worker"). Free tier is
 // enough to start (100,000 requests/day on Cloudflare Workers free).
+//
+// HOW TO EDIT THIS FILE (read before changing anything):
+// - What it needs from Cloudflare: a KV namespace bound as SEFORIM_KV
+//   (sign-in sessions and server wishlists live there) and a plain-text
+//   environment variable GOOGLE_CLIENT_ID (the public Google client id).
+//   Without those two bindings, search still works but sign-in returns
+//   "not configured" — do not deploy this file without them.
+// - Do NOT add a Google client secret anywhere in this file. Sign-in
+//   works by verifying Google's signed ID token (see
+//   verifyGoogleIdToken); no secret is needed, and none must ever be
+//   written here.
+// - INTENTIONAL DUPLICATION: the store list (STORES) and the store
+//   parsers below are copied in app.js as well. That is not an accident
+//   to clean up: app.js is the direct-browser fallback the page uses
+//   when this worker cannot be reached. The worker copy is
+//   authoritative for live site searches; the app.js copy is
+//   authoritative for that fallback. If you change a store's search URL
+//   or a parser, change it in BOTH files, and keep MAX_PER_STORE the
+//   same in both, or the page will trim the worker's results.
+// - Per-store behaviour, in one place (details live beside the code):
+//   at most 100 listings per store; Magento stores take one request
+//   with product_list_limit=100; OpenCart and Shopify stores are
+//   fetched page by page in parallel; SeforimPlace needs a plain
+//   "Mozilla/5.0" agent AND an AJAX header on later pages; eSicha's
+//   API serves 10 listings per page, so pages 1-10 are fetched;
+//   Greenfield is bot-blocked and is meant to come back as an error,
+//   never as invented listings.
 
 const enc = (q) => encodeURIComponent(q);
 
@@ -58,6 +85,10 @@ const MAX_PER_STORE = 100;
 const CACHE_TTL_SECONDS = 600; // 10 minutes
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 SeforimSearch/1.0";
 
+// ---------------------------------------------------------------------------
+// Small helpers shared by the parsers: cleaning text, reading prices and
+// cover images out of raw HTML, and spotting a bot-check page.
+// ---------------------------------------------------------------------------
 function decodeEntities(s) {
   return s.replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
     .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
@@ -104,6 +135,14 @@ function looksBotWalled(html) {
     html.includes("Attention Required! | Cloudflare") || html.includes("sessionStorage.IoI");
 }
 
+// ---------------------------------------------------------------------------
+// One parser per store platform. Each turns a store's search page (or,
+// for eSicha, its product API JSON) into the same shape:
+// { title, url, priceText, priceAmount, compareAtText, imageUrl }.
+// A parser returning [] does not mean "no such sefer" — it can also mean
+// the store changed its page layout, in which case this is the place
+// that needs updating (and the matching parser in app.js too).
+// ---------------------------------------------------------------------------
 function parseMagento(html) {
   const products = []; const seen = new Set();
   const anchorRe = /<a\b[^>]*>([\s\S]*?)<\/a>/g;
@@ -305,6 +344,12 @@ function parseForStore(store, text) {
     default: return [];
   }
 }
+// ---------------------------------------------------------------------------
+// Fetching: which URL(s) to ask each store for, and how the results from
+// several pages are merged. See the per-store notes in extraPageUrls
+// and fetchStoreText — those two functions hold the tricks that make
+// each store return more than its first page.
+// ---------------------------------------------------------------------------
 function targetUrlFor(store, query) {
   if (store.parser === "wooStoreApi") {
     return `https://www.esicha.org/wp-json/wc/store/v1/products?search=${enc(query)}&per_page=${MAX_PER_STORE}`;
@@ -371,6 +416,11 @@ async function searchStoreWorker(store, query) {
   }
   const text = got.text ?? "";
   if (looksBotWalled(text)) {
+    // This is the expected outcome for Greenfield: its challenge page
+    // demands JavaScript, which a server-side fetch cannot run, so the
+    // store honestly reports an error instead of listings. Do not try
+    // to "fix" this by inventing listings or by scraping through a
+    // browser from the worker — that is not what this worker does.
     return { ...base, status: "error",
       message: `${store.name} is showing a bot-check page right now, so its listings can't be loaded here. You can open its own search results instead.`, products: [] };
   }
@@ -401,6 +451,12 @@ async function searchStoreWorker(store, query) {
   return { ...base, status: "ok", message: null, products };
 }
 
+// ---------------------------------------------------------------------------
+// HTTP plumbing: CORS (the live site may send credentials for sign-in;
+// any other origin gets a plain public response) and JSON responses.
+// Search responses are cached for 10 minutes; sign-in and wishlist
+// responses are never cached.
+// ---------------------------------------------------------------------------
 const PAGES_ORIGIN = "https://zakkais.github.io";
 function corsHeaders(request) {
   const origin = request?.headers?.get("Origin");
@@ -426,7 +482,16 @@ function jsonResponse(obj, status = 200, request = null, extraHeaders = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Google sign-in + wishlist storage (KV)
+// Google sign-in + wishlist storage (KV).
+// How sign-in works, briefly: the page's Google button returns a signed
+// ID token, the page posts it to /auth/google, and this worker checks
+// the token's signature against Google's own keys, plus its issuer,
+// audience (must equal GOOGLE_CLIENT_ID), expiry, and verified email.
+// No password and no client secret is involved at any point. A token
+// that passes gets a random session id, stored in KV for 30 days and
+// handed back as a secure, HttpOnly cookie. The wishlist is then stored
+// in KV under that user's Google id — one wishlist per signed-in user,
+// and nothing else about the user is kept.
 // ---------------------------------------------------------------------------
 
 function parseCookies(request) {
@@ -542,6 +607,11 @@ async function handleAuth(request, env, url) {
   return jsonResponse({ error: "Not found" }, 404, request);
 }
 
+// ---------------------------------------------------------------------------
+// Entry point. /auth/* and /api/* are sign-in and wishlist routes (see
+// handleAuth); /stores lists the stores; anything else with ?q= runs a
+// search across the included stores (or one store with &store=<id>).
+// ---------------------------------------------------------------------------
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
