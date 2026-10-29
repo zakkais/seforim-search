@@ -1,5 +1,7 @@
 # Seforim Search (public) — static site
 
+Live site: https://zakkais.github.io/seforim-search/
+
 One search box that shows the actual product listings — cover, title, and
 price — from seven seforim stores, sorted together in one merged grid
 (each card still carries its store badge):
