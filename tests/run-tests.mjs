@@ -58,7 +58,7 @@ section("1. Syntax");
 
 // ---------------------------------------------------------------------------
 section("2. Asset versions");
-const EXPECTED = { ui: 22, styles: 12, app: 11 };
+const EXPECTED = { ui: 23, styles: 12, app: 11 };
 {
   const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
   const uiSrc = readFileSync(join(ROOT, "ui.js"), "utf8");
@@ -91,6 +91,16 @@ section("3. Language parity in ui.js");
     const missing = [...en].filter((k) => !keySets[lang]?.has(k));
     check(`${lang} has every key en has`, missing.length === 0, `missing: ${missing.join(", ")}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+section("3b. Quick-view wiring (static)");
+{
+  const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
+  const uiSrc = readFileSync(join(ROOT, "ui.js"), "utf8");
+  check("index.html has the quick-view modal", indexHtml.includes('id="qv-modal"'));
+  check("cards carry a quick-view button", uiSrc.includes("data-qv-url"));
+  check("quick view calls the worker /product endpoint", uiSrc.includes("/product?url="));
 }
 
 // ---------------------------------------------------------------------------
@@ -196,11 +206,15 @@ section("5. Worker with stubbed stores");
   const dealsHtml = Array.from({ length: 12 }, (_, i) =>
     `<div class="product-item "><a href="/products/tanya-deal-${i + 1}" class="product-item__title">Tanya Deal ${i + 1}</a><span class="price--highlight">$${(10 + i).toFixed(2)}</span></div>`
   ).join("\n");
+  const qvHtml = `<html><head><meta property="og:image" content="https://www.esicha.org/wp-content/uploads/qv-main.jpg"><meta property="og:title" content="QV Stub Sefer"></head><body>` +
+    `<div id="tab-description"><p>Quick view stub description: a full paragraph about this sefer, its author and its contents, long enough to count as a real description.</p></div>` +
+    `<img src="https://www.esicha.org/wp-content/uploads/qv-second.jpg"></body></html>`;
   globalThis.fetch = async (url) => {
     fetchCalls++;
     const u = String(url);
+    if (u.includes("qv-stub")) return new Response(qvHtml, { status: 200 });
     if (u.includes("esicha.org")) return new Response(JSON.stringify(wooProducts), { status: 200 });
-    if (u.includes("seforimdeals.com") && u.includes(".js")) return new Response(JSON.stringify({ available: true, title: "x", variants: [] }), { status: 200 });
+    if (u.includes("seforimdeals.com") && u.includes(".js")) return new Response(JSON.stringify({ available: true, title: "Tanya Deal", variants: [], images: [{ src: "https://cdn.example.invalid/deal-1.jpg" }, { src: "https://cdn.example.invalid/deal-2.jpg" }], description: "<p>A fine sefer with a full description.</p>" }), { status: 200 });
     if (u.includes("seforimdeals.com")) return new Response(dealsHtml, { status: 200 });
     if (u.includes("chabadlibrary.org")) return new Response(JSON.stringify({ count: 0, results: [] }), { status: 200 });
     return new Response("", { status: 200 });
@@ -245,6 +259,20 @@ section("5. Worker with stubbed stores");
     dealsRes.status === 200 && dealsBody.results?.[0]?.products?.length === 12,
     `status ${dealsRes.status}, products ${dealsBody.results?.[0]?.products?.length}`);
   check("search: one store's full path stays inside the budget", fetchCalls < 45, `${fetchCalls} fetches`);
+
+  const qvDeals = await call(`/product?url=${encodeURIComponent("https://seforimdeals.com/products/tanya-deal-1")}`);
+  const qvDealsBody = await qvDeals.json().catch(() => ({}));
+  check("/product returns a Shopify gallery + description",
+    qvDeals.status === 200 && qvDealsBody.images?.length === 2 && String(qvDealsBody.description).includes("fine sefer"),
+    `status ${qvDeals.status}, body ${JSON.stringify(qvDealsBody).slice(0, 140)}`);
+  const qvHtmlRes = await call(`/product?url=${encodeURIComponent("https://www.esicha.org/product/qv-stub")}`);
+  const qvHtmlBody = await qvHtmlRes.json().catch(() => ({}));
+  check("/product extracts gallery + description from a product page",
+    qvHtmlRes.status === 200 && qvHtmlBody.images?.some((s) => s.includes("qv-main.jpg")) &&
+    String(qvHtmlBody.description).includes("Quick view stub description"),
+    `status ${qvHtmlRes.status}, body ${JSON.stringify(qvHtmlBody).slice(0, 140)}`);
+  const qvBad = await call(`/product?url=${encodeURIComponent("https://evil.example.invalid/x")}`);
+  check("/product refuses non-store hosts", qvBad.status === 400, `status ${qvBad.status}`);
 
   const matchRes = await call("/match", {
     method: "POST", headers: { "Content-Type": "application/json" },
