@@ -160,6 +160,92 @@ function variantMap() {
   return map;
 }
 var VARIANT_MAP = variantMap();
+// ---------------------------------------------------------------------------
+// The Hebrew bridge. Sefer titles are often listed in Hebrew only, and
+// shoppers search in transliteration — or the reverse. Each row is
+// [canonical latin, [hebrew forms], ...extra latin spellings]. The
+// ranker canonicalizes BOTH the query and every title through this
+// table, so "minchas elazar" and "מנחת אלעזר" are the same search to
+// it, and expandQuery adds the all-Hebrew form as an extra store
+// query so Hebrew-only listings are fetched, not just ranked. The
+// table starts with the words that actually recur in sefer titles;
+// add a row when a real search shows a word is missing.
+// ---------------------------------------------------------------------------
+const HEBREW_BRIDGE = [
+  ["minchas", ["מנחת"], "minchat", "minhat", "menchas"],
+  ["elazar", ["אלעזר"]],
+  ["tanya", ["תניא"]],
+  ["mishnah", ["משנה"], "mishna"],
+  ["mishnayos", ["משניות"], "mishnayot"],
+  ["berurah", ["ברורה"], "berura", "brurah"],
+  ["shulchan", ["שולחן"], "shulhan"],
+  ["aruch", ["ערוך"], "arukh", "oruch"],
+  ["hilchos", ["הלכות"], "halachos", "halachot", "hilchot", "halacha", "halochos"],
+  ["torah", ["תורה"]],
+  ["chumash", ["חומש"], "humash"],
+  ["tehillim", ["תהלים"], "tehilim"],
+  ["gemara", ["גמרא"], "gemora", "gemorah"],
+  ["talmud", ["תלמוד"]],
+  ["yerushalmi", ["ירושלמי"]],
+  ["bavli", ["בבלי"]],
+  ["siddur", ["סידור"], "sidur"],
+  ["machzor", ["מחזור"], "mahzor"],
+  ["haggadah", ["הגדה"], "hagadah", "hagada"],
+  ["megillah", ["מגילה", "מגילת"], "megila", "megillas"],
+  ["rambam", ["רמבם"]],
+  ["tur", ["טור"]],
+  ["shut", ["שות"]],
+  ["shabbos", ["שבת"], "shabbat", "shabos"],
+  ["pesach", ["פסח"], "pesah"],
+  ["succos", ["סוכות"], "sukkot", "succot"],
+  ["sefer", ["ספר"]],
+  ["seforim", ["ספרים"]],
+  ["shiurim", ["שיעורים"]],
+  ["maamarim", ["מאמרים"]],
+  ["sichos", ["שיחות"], "sichot"],
+  ["likutei", ["ליקוטי"], "likkutey", "likkutei"],
+  ["chassidus", ["חסידות"], "chasidus", "hassidut"],
+  ["tefillah", ["תפילה"], "tefila", "tefilah"],
+  ["brachos", ["ברכות"], "berachos", "berachot"],
+  ["midrash", ["מדרש"], "medrash"],
+  ["rabbah", ["רבה"], "rabba", "raba"],
+  ["zohar", ["זוהר"]],
+  ["kinos", ["קינות"], "kinot"],
+  ["selichos", ["סליחות"], "selichot"],
+  ["pirkei", ["פרקי"]],
+  ["avos", ["אבות"], "avot"],
+  ["mitzvos", ["מצוות"], "mitzvot", "mitsvos"],
+  ["parsha", ["פרשה"], "parshah", "parshas", "parshat"],
+  ["bereishis", ["בראשית"], "bereshit", "bereishit"],
+  ["shemos", ["שמות"], "shemot"],
+  ["vayikra", ["ויקרא"]],
+  ["bamidbar", ["במדבר"], "bemidbar"],
+  ["devarim", ["דברים"]],
+  ["yehoshua", ["יהושע"]],
+  ["shofetim", ["שופטים"], "shoftim"],
+  ["shmuel", ["שמואל"], "shmuell", "shemuel"],
+  ["melachim", ["מלכים"]],
+  ["yeshayahu", ["ישעיהו"], "yeshaya"],
+  ["yirmiyahu", ["ירמיהו"]],
+  ["yechezkel", ["יחזקאל"]],
+  ["daniel", ["דניאל"]],
+  ["ezra", ["עזרא"]],
+  ["nechemya", ["נחמיה"], "nehemiah", "nechemia"],
+  ["divrei", ["דברי"]],
+  ["hayamim", ["הימים"]],
+  ["chayei", ["חיי"], "hayei"],
+];
+const CANON_WORD = new Map();
+const HEBREW_FORM = new Map();
+for (const [latin, hebrews, ...variants] of HEBREW_BRIDGE) {
+  CANON_WORD.set(latin, latin);
+  for (const h of hebrews) CANON_WORD.set(h, latin);
+  for (const v of variants) CANON_WORD.set(v, latin);
+  HEBREW_FORM.set(latin, hebrews[0]);
+}
+function canonWords(words) {
+  return words.map((w) => CANON_WORD.get(w) ?? w);
+}
 function expandQuery(query) {
   const words = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return [query];
@@ -186,6 +272,15 @@ function expandQuery(query) {
     if (!seen.has(c)) { seen.add(c); out.push(c); }
   }
   if (out.length === 0 || out[0] !== query.trim().toLowerCase()) out.unshift(query.trim());
+  // If every word has a Hebrew form, search the title in Hebrew too:
+  // many listings exist in Hebrew only, and some stores match them
+  // only under a Hebrew query. It goes right after the original query
+  // so the 12-variant cap can't squeeze it out.
+  const hebrewForms = words.map((w) => HEBREW_FORM.get(CANON_WORD.get(w) ?? w));
+  if (hebrewForms.length === words.length && hebrewForms.every(Boolean)) {
+    const hq = hebrewForms.join(" ");
+    if (!seen.has(hq) && !out.includes(hq)) out.splice(1, 0, hq);
+  }
   return out.slice(0, 12);
 }
 function mergeProducts(listOfLists) {
@@ -733,11 +828,22 @@ function levenshtein(a, b) {
 // present, some query words present, none present. Within a tier, the
 // average per-word edit distance to the title's words breaks ties, so a
 // title spelled like the query ("midrash") outranks a farther variant
-// ("medrash", "midresh") and a merely similar word. Price, then title,
-// breaks remaining ties.
+// ("medrash", "midresh") and a merely similar word. A small penalty per
+// extra title word follows, so between two titles that both contain the
+// query the shorter, more focused one wins ("שו"ת מנחת אלעזר" over a
+// longer title that merely mentions the name). Price, then title,
+// breaks remaining ties in sortProducts.
+//
+// Both sides are canonicalized through the Hebrew bridge first (see
+// HEBREW_BRIDGE above), and the abbreviation שו"ת is folded to "shut"
+// before word-splitting, since its quote mark would otherwise split it
+// into fragments. Without the bridge, a Hebrew-only title scored
+// "none" against a transliterated query and sank to the very bottom —
+// the bug behind "minchas elazar" ranking its only real match last.
 function priorityScore(title, query) {
-  const qWords = normWords(query);
-  const tWords = normWords(title);
+  const foldShut = (s) => String(s || "").replace(/שו["'׳״]ת/g, " shut ");
+  const qWords = canonWords(normWords(foldShut(query)));
+  const tWords = canonWords(normWords(foldShut(title)));
   const q = qWords.join(" ");
   const t = tWords.join(" ");
   if (!q) return 0;
@@ -754,7 +860,20 @@ function priorityScore(title, query) {
   else if (matched > 0) tier = 4;
   else tier = 5;
   const avgDist = minDists.length ? minDists.reduce((a, b) => a + b, 0) / minDists.length : 99;
-  return tier * 1000 + avgDist * 10;
+  const extraWords = Math.max(0, tWords.length - qWords.length);
+  // A title that matches the query exactly AS TYPED (before any
+  // canonicalizing) still beats one that only matches through the
+  // bridge or a spelling variant: searching "mishnah berurah" should
+  // put "Mishnah Berurah" ahead of "Mishna Berura", even though the
+  // bridge treats them as the same words.
+  const rawQ = normWords(query).join(" ");
+  const rawT = normWords(title).join(" ");
+  const rawBonus = !rawQ ? 0
+    : rawT === rawQ ? -50
+    : rawT.startsWith(rawQ) ? -30
+    : rawT.includes(rawQ) ? -15
+    : 0;
+  return tier * 1000 + avgDist * 10 + extraWords + rawBonus;
 }
 function sortProducts(products, mode, query) {
   if (mode === "priority") {
