@@ -3,10 +3,10 @@
 Live site: https://zakkais.github.io/seforim-search/
 
 One search box that shows the actual product listings — cover, title, and
-price — from seven seforim stores, sorted together in one merged grid
+price — from six seforim stores, sorted together in one merged grid
 (each card still carries its store badge):
 
-Feldheim · Z. Berman Books · SeforimDeals · SeforimPlace ·
+Z. Berman Books · SeforimDeals · SeforimPlace ·
 Hamafitz · Greenfield Judaica · eSicha
 
 Clicking a listing opens it on the store's own product page. Filters:
@@ -20,8 +20,10 @@ wishlist, which can hold saved listings and plain titles to look up
 later. Searching also covers alternate English transliterations
 (e.g. midrash/medrash).
 
-SAFE MODE (2026-10-28): Eichler's was removed because its robots.txt
-disallows its search route, and no bot-wall workaround is used — a
+SAFE MODE (2026-10-28, extended 2026-11-03): Eichler's was removed
+because its robots.txt disallows its search route, and Feldheim was
+removed because its robots.txt disallows the whole site to ordinary
+agents as well as its search route. No bot-wall workaround is used — a
 store that answers a bot-check page is accepted as an error and
 omitted. That currently leaves SeforimPlace returning no listings.
 

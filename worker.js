@@ -50,9 +50,11 @@
 //   fetched page by page in parallel; eSicha's API serves 10 listings
 //   per page, so pages 1-10 are fetched; Greenfield is bot-blocked
 //   and is meant to come back as an error, never as invented listings.
-// - SAFE MODE (2026-10-28): Eichler's is NOT in the store list — its
-//   robots.txt disallows its search route (/catalogsearch/), so it is
-//   not fetched. Every store is fetched with the same identified
+// - SAFE MODE (2026-10-28, extended 2026-11-03): Eichler's and
+//   Feldheim are NOT in the store list — Eichler's robots.txt
+//   disallows its search route (/catalogsearch/), and Feldheim's
+//   disallows both the whole site for ordinary agents and its search
+//   route, so neither is fetched. Every store is fetched with the same identified
 //   agent below (SeforimSearch/1.0); no plain-agent workaround is
 //   used, so a store that answers a bot-check page (SeforimPlace
 //   does, for non-browser agents) simply returns no listings and is
@@ -61,8 +63,6 @@
 const enc = (q) => encodeURIComponent(q);
 
 const STORES = [
-  { id: "feldheim", name: "Feldheim", parser: "magento",
-    searchUrl: (q) => `https://www.feldheim.com/catalogsearch/result/?q=${enc(q)}` },
   { id: "zberman", name: "Z. Berman Books", parser: "magento",
     searchUrl: (q) => `https://zbermanbooks.com/catalogsearch/result/?q=${enc(q)}` },
   { id: "seforimdeals", name: "SeforimDeals", parser: "shopify",

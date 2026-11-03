@@ -34,12 +34,6 @@
 var enc = (q) => encodeURIComponent(q);
 var STORES = [
   {
-    id: "feldheim",
-    name: "Feldheim",
-    parser: "magento",
-    searchUrl: (q) => `https://www.feldheim.com/catalogsearch/result/?q=${enc(q)}`
-  },
-  {
     id: "zberman",
     name: "Z. Berman Books",
     parser: "magento",
@@ -169,6 +163,11 @@ var VARIANT_MAP = variantMap();
 function expandQuery(query) {
   const words = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return [query];
+  // An ISBN is an exact identifier, not a phrase: never expand it into
+  // spelling variants (variant searches on a number are pure noise).
+  // Stores match the number against their ISBN fields as-is.
+  const compact = words.join("").replace(/-/g, "");
+  if (/^\d{9}[\dx]$/i.test(compact) || /^\d{13}$/.test(compact)) return [query.trim()];
   const perWord = words.map((w) => {
     const alts = VARIANT_MAP.get(w);
     return alts ? [w, ...[...alts].filter((a) => a !== w)] : [w];
