@@ -1,8 +1,11 @@
 /* Seforim Search — bookshop theme on top of Bootstrap 5.
  *
  * What this file does: it paints the page (warm paper colours, the
- * Spectral display font, product cards, the sale stamp, wishlist
- * buttons) on top of Bootstrap's layout and components. It contains no
+ * Spectral display font) on top of Bootstrap's layout and components.
+ * Components themselves — cards, the grid, badges, buttons, alerts,
+ * the list group, the modal — are Bootstrap's, per the site owner's
+ * standing rule; this file holds palette and typography only, plus
+ * the few things Bootstrap has no utility for. It contains no
  * behaviour — everything clickable is wired up in ui.js.
  *
  * How to edit it safely: change colours in the :root block below and
@@ -99,10 +102,9 @@ body {
 }
 .navbar-nav .nav-link { color: var(--navy); font-weight: 500; padding: 4px 0; }
 .navbar-nav .nav-link:hover { text-decoration: underline; }
-/* Save button sits above the card's stretched title link. */
-.save-btn { position: relative; z-index: 2; border: 1px solid var(--line); background-color: var(--surface); color: var(--ink); white-space: nowrap; }
-.save-btn.saved { color: var(--rust); font-weight: 600; }
-.wish-title-row { border: 1px solid var(--line); background-color: var(--surface); border-radius: 8px; }
+/* Wishlist save/remove buttons are Bootstrap buttons (btn-outline-
+   secondary / btn-secondary) with Bootstrap's position-relative and
+   z-2 utilities, so they sit above the card's stretched title link. */
 
 /* Search box and buttons. */
 .search-input {
@@ -136,32 +138,26 @@ body {
 }
 .btn-navy:hover { filter: brightness(1.12); }
 
-.filter-btn, .sort-select {
-  border: 1px solid var(--line);
-  background-color: var(--surface);
-  color: var(--ink);
-}
-.sort-select:focus { border-color: var(--navy); box-shadow: 0 0 0 0.2rem rgba(29, 42, 91, 0.15); }
-
-/* Cards, panels, and result headings. */
+/* Cards, panels, and result headings. The stores toggle is a
+   Bootstrap outline button and the sort control a Bootstrap
+   form-select; only the card surface colour is themed here. */
 .card { background-color: var(--surface); border-color: var(--line); }
-.panel-title { font-size: 1.25rem; }
 
 .form-check-input:checked {
   background-color: #1d2a5b;
   border-color: #1d2a5b;
 }
 
-.warning-text { color: var(--rust); }
-
 .results-rule { border-bottom: 2px solid var(--navy); }
-.results-title { font-size: 1.6rem; }
 
-/* Product cards: the cover, the store badge, the title (clamped to
-   three lines), the "On sale" stamp, and the price. */
-.product-card { background-color: var(--surface); border-color: var(--line); }
+/* Product cards are Bootstrap cards in a Bootstrap row-cols grid.
+   What remains here is theme only: the image well's colour, the
+   cover's fixed height (its object-fit is Bootstrap's
+   object-fit-contain utility, set in ui.js), the store badge's gold,
+   the title clamp (Bootstrap has no multi-line clamp), and the
+   price colour. The "On sale" stamp is a Bootstrap badge. */
 .product-img-wrap { background-color: var(--surface-alt); }
-.product-img { height: 150px; object-fit: contain; }
+.product-img { height: 150px; }
 .product-title {
   color: var(--ink);
   font-size: 0.98rem;
@@ -171,25 +167,7 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.sale-stamp {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 2;
-  background-color: var(--rust);
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 3px 8px;
-  border-radius: 999px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-}
 .store-badge {
-  display: flex;
-  align-items: center;
-  gap: 5px;
   font-size: 0.76rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -201,12 +179,9 @@ body {
   .price { color: var(--gold); }
 }
 
-/* Empty-results note (stores with no listings are otherwise left out
-   of the grid entirely, with no per-store notice). */
-.empty-box { border: 1px solid var(--line); background-color: var(--surface); }
-
-.idle-box { border: 1px solid var(--line); background-color: var(--surface); }
+/* The empty-results note is a Bootstrap alert and the idle panel a
+   Bootstrap card (see ui.js and index.html); stores with no listings
+   are otherwise left out of the grid entirely, with no per-store
+   notice. */
 .book-icon { width: fit-content; color: var(--gold); }
 .idle-text { max-width: 520px; font-size: 0.98rem; line-height: 1.6; }
-
-.footer-note { border-top: 1px solid var(--line); }

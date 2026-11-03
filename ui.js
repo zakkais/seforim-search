@@ -62,6 +62,7 @@ const I18N = {
     footerNote: "Listings, covers, and prices come live from each store's own website at search time. Searching needs no account; signing in with Google is optional and only syncs your wishlist. Your store choices and your local wishlist are kept in your own browser.",
     storesIncluded: "Stores · {n} of {total} included",
     save: "♡ Save", saved: "♥ Saved", remove: "Remove", onSale: "On sale", priceAtStore: "Price at store",
+    scan: "Scan ISBN", scanTitle: "Scan an ISBN or QR code", scanHint: "Point the camera at the barcode on the back of the sefer.", scanUnsupported: "Scanning is not supported in this browser — type the ISBN into the search box instead.", cancel: "Cancel",
     resultsFor: "Results for “{q}”", listingsLoadedOne: "1 listing loaded", listingsLoadedOther: "{n} listings loaded",
     alsoSearchedFor: "Also searched for: ", searching: "Searching {stores}…",
     noListings: "No listings matched “{q}” at the included stores.",
@@ -86,6 +87,7 @@ const I18N = {
     footerNote: "המודעות, הכריכות והמחירים מגיעים בשידור חי מאתר כל חנות בעת החיפוש. החיפוש אינו דורש חשבון; כניסה עם גוגל היא אופציונלית ורק מסנכרנת את רשימת הספרים השמורים. בחירת החנויות ורשימת הספרים המקומית נשמרות בדפדפן שלך.",
     storesIncluded: "חנויות · {n} מתוך {total} כלולות",
     save: "♡ שמור", saved: "♥ נשמר", remove: "הסר", onSale: "במבצע", priceAtStore: "מחיר בחנות",
+    scan: "סריקת ISBN", scanTitle: "סריקת ISBN או קוד QR", scanHint: "כוונו את המצלמה אל הברקוד שבגב הספר.", scanUnsupported: "הסריקה אינה נתמכת בדפדפן זה — הקלידו את ה-ISBN בתיבת החיפוש.", cancel: "ביטול",
     resultsFor: "תוצאות עבור “{q}”", listingsLoadedOne: "מודעה אחת נטענה", listingsLoadedOther: "{n} מודעות נטענו",
     alsoSearchedFor: "חיפשנו גם: ", searching: "מחפש ב־{stores}…",
     noListings: "לא נמצאו מודעות עבור “{q}” בחנויות הכלולות.",
@@ -110,6 +112,7 @@ const I18N = {
     footerNote: "ליסטינגס, דעקלעך און פּרײַזן קומען לעבעדיק פֿון יעדער קראָם׳ס אייגענער וועבזײַט בעת דעם זוכן. זוכן דאַרף קיין חשבון; אײַנצייכענען מיט גוגל איז פֿרײַוויליק און סינקראָניזירט נאָר אײַער ווישליסט. אײַערע קראָם־קלייַבן און לאָקאַלע ווישליסט ווערן געהאַלטן אין אײַער בלעטערער.",
     storesIncluded: "קראָמען · {n} פֿון {total} אַרײַנגענומען",
     save: "♡ האַלטן", saved: "♥ געהאַלטן", remove: "אַראָפּנעמען", onSale: "אויף סעיל", priceAtStore: "פּרײַז אין קראָם",
+    scan: "סקענען ISBN", scanTitle: "סקענען אַן ISBN אָדער QR קאָד", scanHint: "ווײַזט די קאַמעראַ אויפֿן באַרקאָד אויפֿן רוקן פֿונעם ספֿר.", scanUnsupported: "סקענען ווערט נישט געשטיצט אין דעם בלעטערער — טיפּט דעם ISBN אין דער זוך־קעסטל.", cancel: "אָפּזאָגן",
     resultsFor: "רעזולטאַטן פֿאַר “{q}”", listingsLoadedOne: "1 ליסטינג געלאַדן", listingsLoadedOther: "{n} ליסטינגס געלאַדן",
     alsoSearchedFor: "אויך געזוכט: ", searching: "זוכן אין {stores}…",
     noListings: "קיין ליסטינגס האָבן נישט געפּאַסט “{q}” אין די אַרײַנגענומענע קראָמען.",
@@ -134,6 +137,7 @@ const I18N = {
     footerNote: "Los anuncios, portadas y precios llegan en vivo desde el sitio web de cada tienda al buscar. Buscar no necesita cuenta; iniciar sesión con Google es opcional y solo sincroniza tu lista de deseos. Tus tiendas elegidas y tu lista local se guardan en tu navegador.",
     storesIncluded: "Tiendas · {n} de {total} incluidas",
     save: "♡ Guardar", saved: "♥ Guardado", remove: "Quitar", onSale: "En oferta", priceAtStore: "Precio en tienda",
+    scan: "Escanear ISBN", scanTitle: "Escanea un ISBN o código QR", scanHint: "Apunta la cámara al código de barras en la parte trasera del libro.", scanUnsupported: "El escaneo no es compatible con este navegador: escribe el ISBN en el cuadro de búsqueda.", cancel: "Cancelar",
     resultsFor: "Resultados para “{q}”", listingsLoadedOne: "1 anuncio cargado", listingsLoadedOther: "{n} anuncios cargados",
     alsoSearchedFor: "También se buscó: ", searching: "Buscando en {stores}…",
     noListings: "Ningún anuncio coincidió con “{q}” en las tiendas incluidas.",
@@ -158,6 +162,7 @@ const I18N = {
     footerNote: "Les annonces, couvertures et prix proviennent en direct du site de chaque boutique au moment de la recherche. La recherche ne nécessite aucun compte ; se connecter avec Google est facultatif et ne fait que synchroniser votre liste de souhaits. Vos boutiques choisies et votre liste locale sont conservées dans votre navigateur.",
     storesIncluded: "Boutiques · {n} sur {total} incluses",
     save: "♡ Enregistrer", saved: "♥ Enregistré", remove: "Retirer", onSale: "En solde", priceAtStore: "Prix en boutique",
+    scan: "Scanner l'ISBN", scanTitle: "Scanner un ISBN ou un code QR", scanHint: "Pointez l'appareil photo vers le code-barres au dos du livre.", scanUnsupported: "La numérisation n'est pas prise en charge dans ce navigateur — saisissez l'ISBN dans la zone de recherche.", cancel: "Annuler",
     resultsFor: "Résultats pour « {q} »", listingsLoadedOne: "1 annonce chargée", listingsLoadedOther: "{n} annonces chargées",
     alsoSearchedFor: "Aussi recherché : ", searching: "Recherche dans {stores}…",
     noListings: "Aucune annonce ne correspond à « {q} » dans les boutiques incluses.",
@@ -372,20 +377,20 @@ function productCard(store, p, wishMode) {
     : `<span class="text-secondary small">${t("priceAtStore")}</span>`;
   const saved = savedUrls().has(p.url);
   const wishBtn = wishMode === "remove"
-    ? `<button type="button" class="btn btn-sm save-btn" data-wish-url="${esc(p.url)}">${t("remove")}</button>`
-    : `<button type="button" class="btn btn-sm save-btn ${saved ? "saved" : ""}" data-wish-url="${esc(p.url)}">${saved ? t("saved") : t("save")}</button>`;
+    ? `<button type="button" class="btn btn-sm btn-outline-secondary position-relative z-2" data-wish-url="${esc(p.url)}">${t("remove")}</button>`
+    : `<button type="button" class="btn btn-sm ${saved ? "btn-secondary" : "btn-outline-secondary"} position-relative z-2" data-wish-url="${esc(p.url)}"${saved ? ` aria-pressed="true"` : ""}>${saved ? t("saved") : t("save")}</button>`;
   const img = p.imageUrl
     ? `<img src="${esc(p.imageUrl)}" alt="${esc(p.title)}" loading="lazy"
-            class="w-100 product-img" onerror="this.outerHTML=window.__sspFallbackImg">`
+            class="w-100 object-fit-contain product-img" onerror="this.outerHTML=window.__sspFallbackImg">`
     : FALLBACK_IMG;
   return `
     <div class="col">
-      <div class="card h-100 shadow-sm position-relative product-card">
+      <div class="card h-100 shadow-sm position-relative">
         <div class="p-2 pb-0">
-          <div class="rounded product-img-wrap position-relative">${img}${p.compareAtText ? `<span class="sale-stamp">${t("onSale")}</span>` : ""}</div>
+          <div class="rounded product-img-wrap position-relative">${img}${p.compareAtText ? `<span class="badge rounded-pill text-bg-danger position-absolute top-0 start-0 m-2 z-2 shadow-sm text-uppercase">${t("onSale")}</span>` : ""}</div>
         </div>
         <div class="card-body d-flex flex-column pt-2">
-          <p class="store-badge mb-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><path d="M9 21V13h6v8"/></svg>${esc(store.name)}</p>
+          <p class="store-badge d-flex align-items-center gap-1 mb-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><path d="M9 21V13h6v8"/></svg>${esc(store.name)}</p>
           <a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"
              class="stretched-link font-display fw-medium text-decoration-none product-title"
              aria-label="View ${esc(p.title)} at ${esc(store.name)}">${esc(p.title)}</a>
@@ -412,7 +417,7 @@ function renderResults() {
   const extraVariants = activeVariants.filter((v) => v !== activeQuery.toLowerCase());
   let html = `
     <div class="d-flex flex-wrap align-items-baseline justify-content-between gap-2 pb-2 results-rule">
-      <h2 class="font-display fw-semibold mb-0 results-title">${t("resultsFor", { q: esc(activeQuery) })}</h2>
+      <h2 class="font-display fw-semibold mb-0 fs-3">${t("resultsFor", { q: esc(activeQuery) })}</h2>
       ${anyLoading ? "" : `<p class="text-secondary small mb-0">${listingsLoadedText(total)}</p>`}
     </div>
     ${extraVariants.length ? `<p class="text-secondary small mb-0">${t("alsoSearchedFor")}${extraVariants.map((v) => `“${esc(v)}”`).join(", ")}</p>` : ""}
@@ -449,7 +454,7 @@ function renderResults() {
     html += `<div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-1">` +
       sorted.map((p) => productCard(byProduct.get(p), p)).join("") + `</div>`;
   } else if (!anyLoading) {
-    html += `<p class="mt-3 p-3 rounded text-secondary empty-box">${t("noListings", { q: esc(activeQuery) })}</p>`;
+    html += `<div class="alert alert-light border text-secondary mt-3" role="note">${t("noListings", { q: esc(activeQuery) })}</div>`;
   }
   section.innerHTML = html;
 }
@@ -553,7 +558,7 @@ function renderWishlist() {
   titlesWrap.innerHTML = wishlist.titles.length
     ? `<p class="text-secondary small mb-2">${t("titlesToLookUp")}</p>` +
       wishlist.titles.map((t) => `
-        <div class="wish-title-row d-flex justify-content-between align-items-center gap-2 px-3 py-2 mb-2">
+        <div class="list-group-item d-flex justify-content-between align-items-center gap-2 px-3 py-2">
           <button type="button" class="btn p-0 text-start fw-medium flex-grow-1" data-wish-title="${esc(t)}">${esc(t)}</button>
           <button type="button" class="btn btn-sm text-secondary" data-wish-title-remove="${esc(t)}" aria-label="Remove ${esc(t)}">✕</button>
         </div>`).join("")
@@ -669,6 +674,76 @@ function setAllStores(enabled) {
 }
 
 // ---------------------------------------------------------------------------
+// ISBN / QR scanner (button inside the search bar)
+// ---------------------------------------------------------------------------
+// The scan button sits in the search bar's input group and opens a
+// Bootstrap modal with the camera view. Detection uses the browser's
+// built-in BarcodeDetector (Chrome/Android); where that is missing,
+// the modal says so plainly and typing the ISBN still works, because
+// ISBN queries are searched exactly (see expandQuery in app.js).
+
+let scanStream = null;
+let scanTimer = null;
+let scanBusy = false;
+
+function stopScan() {
+  if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+  if (scanStream) { scanStream.getTracks().forEach((tr) => tr.stop()); scanStream = null; }
+  const video = $("#scan-video");
+  if (video) video.srcObject = null;
+}
+
+// A scanned QR code may hold a URL or text around the number; pull an
+// ISBN-looking token out when there is one, else fall back to the
+// longest run of digits.
+function extractIsbn(raw) {
+  for (const tok of String(raw).split(/[^0-9Xx]+/)) {
+    if (/^\d{13}$/.test(tok) || /^\d{9}[\dXx]$/.test(tok)) return tok.toUpperCase();
+  }
+  const digits = String(raw).replace(/\D/g, "");
+  return digits.length >= 8 ? digits : null;
+}
+
+async function startScan() {
+  const status = $("#scan-status");
+  const video = $("#scan-video");
+  const supported = "BarcodeDetector" in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+  if (!supported) {
+    video.classList.add("d-none");
+    status.textContent = t("scanUnsupported");
+    return;
+  }
+  video.classList.remove("d-none");
+  status.textContent = t("scanHint");
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+  } catch (e) {
+    status.textContent = t("scanUnsupported");
+    return;
+  }
+  video.srcObject = scanStream;
+  await video.play().catch(() => {});
+  const detector = new window.BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "qr_code"] });
+  scanTimer = setInterval(async () => {
+    if (scanBusy) return;
+    scanBusy = true;
+    try {
+      const codes = await detector.detect(video);
+      if (codes && codes.length) {
+        const raw = String(codes[0].rawValue || "").trim();
+        if (raw) {
+          stopScan();
+          const modalEl = $("#scan-modal");
+          if (window.bootstrap && modalEl) window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+          runSearch(extractIsbn(raw) || raw);
+        }
+      }
+    } catch (e) { /* a failed frame is not fatal; keep scanning */ }
+    scanBusy = false;
+  }, 350);
+}
+
+// ---------------------------------------------------------------------------
 // Wire up
 // ---------------------------------------------------------------------------
 
@@ -746,6 +821,12 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     runSearch(input.value);
   });
+
+  const scanModal = $("#scan-modal");
+  if (scanModal) {
+    scanModal.addEventListener("shown.bs.modal", startScan);
+    scanModal.addEventListener("hidden.bs.modal", stopScan);
+  }
 
   renderStoresButton();
 });
