@@ -65,6 +65,7 @@
         <p class="nav-category mb-1 mt-3" data-i18n="wishlist">Wishlist</p>
         <ul class="navbar-nav">
           <li class="nav-item"><button id="wishlist-nav-btn" type="button" class="nav-link text-start"><span data-i18n="myWishlist">My wishlist</span> <span id="wishlist-count" class="text-secondary"></span></button></li>
+          <li class="nav-item"><button id="ship-nav-btn" type="button" class="nav-link text-start" data-bs-toggle="modal" data-bs-target="#ship-modal"><span data-i18n="shippingTax">Shipping &amp; tax</span></button></li>
         </ul>
         <p class="nav-category mb-1 mt-3" data-i18n="external">External resources</p>
         <ul class="navbar-nav">
@@ -120,6 +121,15 @@
         </p>
         <p class="text-secondary small mb-0 mt-2" data-i18n="storeChoicesNote">Your store choices are kept in this browser only.</p>
       </div>
+    </section>
+
+    <!-- New-releases feed: ui.js fills this from the worker's
+         /new-releases list and hides it while searching. -->
+    <section id="new-releases" class="mt-4 d-none" aria-label="New releases">
+      <div class="d-flex align-items-end justify-content-between gap-2 pb-2 results-rule">
+        <h2 class="font-display fw-semibold mb-0 fs-3" data-i18n="newReleases">New &amp; just in</h2>
+      </div>
+      <div id="new-releases-grid" class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-1"></div>
     </section>
 
     <section id="results" aria-label="Search results" class="mt-4"></section>
@@ -187,8 +197,64 @@
     </div>
   </div>
 
+  <!-- Shipping & tax: what each store itself publishes (see the
+       research notes). No invented numbers: where a store publishes
+       no rate, the table says so, in every language. -->
+  <div class="modal fade" id="ship-modal" tabindex="-1" aria-labelledby="ship-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5 font-display" id="ship-modal-title" data-i18n="shippingTax">Shipping &amp; tax</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-secondary small" data-i18n="shipNote">What each store itself publishes about its shipping and tax. Where a store publishes no rate, only its own checkout has the real number — this page doesn’t guess.</p>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr><th scope="col">Store</th><th scope="col">Shipping</th><th scope="col">Tax</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row" class="fw-semibold">Z. Berman Books</th>
+                  <td>No published rates. UPS or USPS, priced by weight and destination; standard delivery is USPS Media Mail (2–8 business days).</td>
+                  <td>Not published</td>
+                </tr>
+                <tr>
+                  <th scope="row" class="fw-semibold">SeforimDeals</th>
+                  <td>No general rates or free-shipping threshold published. Product pages show a per-order delivery estimate; free local delivery options in Crown Heights and Morristown.</td>
+                  <td>Not published</td>
+                </tr>
+                <tr>
+                  <th scope="row" class="fw-semibold">SeforimPlace (Sossover’s)</th>
+                  <td>Product pages badge “Free Shipping on orders above $49”. The store’s delivery page: US/Canada shipping calculated at checkout by location and weight (UPS Ground / USPS); Crown Heights local delivery free over $75, otherwise $5.</td>
+                  <td>Not published</td>
+                </tr>
+                <tr>
+                  <th scope="row" class="fw-semibold">Hamafitz</th>
+                  <td>No shipping policy published.</td>
+                  <td>Not published</td>
+                </tr>
+                <tr>
+                  <th scope="row" class="fw-semibold">Greenfield Judaica</th>
+                  <td>No shipping policy published. (It currently returns no listings here.)</td>
+                  <td>Not published</td>
+                </tr>
+                <tr>
+                  <th scope="row" class="fw-semibold">eSicha</th>
+                  <td>No shipping policy published; some items note they may take up to 45 days to ship.</td>
+                  <td>Not published</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script type="module" src="./ui.js?v=11"></script>
+  <script type="module" src="./ui.js?v=12"></script>
 </body>
 </html>

@@ -335,11 +335,16 @@ function parseShopify(html) {
     if (products.length >= MAX_PER_STORE)
       break;
     const chunk = block.slice(0, 7000);
-    const titleM = chunk.match(/<a href="(\/products\/[^"]+)"[^>]*class="product-item__title[^"]*"[^>]*>([\s\S]*?)<\/a>/);
+    const titleM = chunk.match(/<a href="([^"]*\/products\/[^"]+)"[^>]*class="product-item__title[^"]*"[^>]*>([\s\S]*?)<\/a>/);
     if (!titleM?.[1] || !titleM[2])
       continue;
-    const path = titleM[1].split("?")[0] ?? titleM[1];
-    const url = `https://seforimdeals.com${path}`;
+    // Collection pages prefix the href with /collections/<name>; the
+    // canonical product URL is always /products/<handle>. (Search
+    // pages already link that way, so this changes nothing for them.)
+    const handle = titleM[1].split("?")[0].split("/products/")[1];
+    if (!handle)
+      continue;
+    const url = `https://seforimdeals.com/products/${handle}`;
     if (seen.has(url))
       continue;
     const title = cleanText(titleM[2]);

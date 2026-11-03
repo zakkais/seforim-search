@@ -188,10 +188,15 @@ function parseShopify(html) {
   for (const block of blocks.slice(1)) {
     if (products.length >= MAX_PER_STORE) break;
     const chunk = block.slice(0, 7000);
-    const titleM = chunk.match(/<a href="(\/products\/[^"]+)"[^>]*class="product-item__title[^"]*"[^>]*>([\s\S]*?)<\/a>/);
+    const titleM = chunk.match(/<a href="([^"]*\/products\/[^"]+)"[^>]*class="product-item__title[^"]*"[^>]*>([\s\S]*?)<\/a>/);
     if (!titleM?.[1] || !titleM[2]) continue;
-    const path = titleM[1].split("?")[0] ?? titleM[1];
-    const url = `https://seforimdeals.com${path}`;
+    // Collection pages prefix the href with /collections/<name>; the
+    // canonical product URL is always /products/<handle>. (Search
+    // pages already link that way, so this changes nothing for them.
+    // The new-releases feed reads a collection page — see below.)
+    const handle = titleM[1].split("?")[0].split("/products/")[1];
+    if (!handle) continue;
+    const url = `https://seforimdeals.com/products/${handle}`;
     if (seen.has(url)) continue;
     const title = cleanText(titleM[2]);
     if (!title) continue;
@@ -345,6 +350,45 @@ function parseForStore(store, text) {
     case "wooStoreApi": return parseWooStoreApi(text);
     default: return [];
   }
+}
+function parseKehot(html) {
+  // Kehot's department listing (store.kehotonline.com/products.asp):
+  // each product has a class="producttitlelink" anchor to
+  // prodinfo.asp?number=<SKU>, its cover in an <img> with class
+  // "prodlistimg" shortly before the anchor (a relative "images/..."
+  // path), and its price in a <span class="ProductPrice"> shortly
+  // after. There is no list price on the listing page, so
+  // compareAtText is always null. Used only by the new-releases feed
+  // below; Kehot search itself is a POST form and stays out of the
+  // worker, as before.
+  const products = []; const seen = new Set();
+  const anchorRe = /<a\b[^>]*class="producttitlelink"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+  for (const m of html.matchAll(anchorRe)) {
+    if (products.length >= MAX_PER_STORE) break;
+    const url = decodeEntities(m[1]);
+    if (!url || seen.has(url)) continue;
+    const title = cleanText(m[2] ?? "");
+    if (!title) continue;
+    seen.add(url);
+    const idx = m.index ?? 0;
+    let imageUrl = null;
+    const before = html.slice(Math.max(0, idx - 2500), idx);
+    const imgs = before.match(/<img\b[^>]*prodlistimg[^>]*>/gi) ?? [];
+    if (imgs.length) {
+      const srcM = imgs[imgs.length - 1].match(/src="([^"]+)"/i);
+      if (srcM?.[1]) {
+        const v = decodeEntities(srcM[1]);
+        if (!/clear\.gif|spacer/i.test(v)) {
+          imageUrl = v.startsWith("http") ? v : `https://store.kehotonline.com/${v.replace(/^\//, "")}`;
+        }
+      }
+    }
+    let priceAmount = null;
+    const priceM = html.slice(idx, idx + 5000).match(/class="ProductPrice">\s*\$\s?([\d,]+(?:\.\d{2})?)/);
+    if (priceM?.[1]) { const n = parseFloat(priceM[1].replace(/,/g, "")); if (Number.isFinite(n)) priceAmount = n; }
+    products.push({ title, url, priceText: priceAmount == null ? null : money(priceAmount), priceAmount, compareAtText: null, imageUrl });
+  }
+  return products;
 }
 // ---------------------------------------------------------------------------
 // Fetching: which URL(s) to ask each store for, and how the results from
@@ -552,16 +596,70 @@ async function getSession(request, env) {
 function sessionCookie(sid, maxAge) {
   return `ssp_session=${sid}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${maxAge}`;
 }
-function cleanWishlist(body) {
-  const items = Array.isArray(body?.items) ? body.items.slice(0, 500).map((i) => ({
+function cleanWishlistItem(i) {
+  if (!i || typeof i !== "object") return null;
+  const item = {
     url: String(i.url || "").slice(0, 2000), title: String(i.title || "").slice(0, 500),
     imageUrl: i.imageUrl ? String(i.imageUrl).slice(0, 2000) : null,
     priceText: i.priceText ? String(i.priceText).slice(0, 50) : null,
     compareAtText: i.compareAtText ? String(i.compareAtText).slice(0, 50) : null,
     storeId: String(i.storeId || "").slice(0, 50), storeName: String(i.storeName || "").slice(0, 100),
-  })).filter((i) => i.url && i.title) : [];
-  const titles = Array.isArray(body?.titles) ? [...new Set(body.titles.map((t) => String(t).slice(0, 300)).filter(Boolean))].slice(0, 200) : [];
-  return { items, titles };
+    addedAt: Number.isFinite(+i.addedAt) ? +i.addedAt : 0,
+  };
+  return item.url && item.title ? item : null;
+}
+function cleanWishlistTitle(t) {
+  if (typeof t === "string") return t ? { text: t.slice(0, 300), addedAt: 0 } : null;
+  if (t && typeof t === "object" && t.text) {
+    return { text: String(t.text).slice(0, 300), addedAt: Number.isFinite(+t.addedAt) ? +t.addedAt : 0 };
+  }
+  return null;
+}
+function cleanDeleted(d) {
+  const out = { urls: {}, titles: {} };
+  if (d && typeof d === "object") {
+    for (const [k, v] of Object.entries(d.urls ?? {}).slice(0, 1000)) {
+      const ts = +v;
+      if (k && Number.isFinite(ts) && ts > 0) out.urls[String(k).slice(0, 2000)] = ts;
+    }
+    for (const [k, v] of Object.entries(d.titles ?? {}).slice(0, 500)) {
+      const ts = +v;
+      if (k && Number.isFinite(ts) && ts > 0) out.titles[String(k).toLowerCase().slice(0, 300)] = ts;
+    }
+  }
+  return out;
+}
+// Wishlist shape v2: items and titles carry an addedAt stamp, and a
+// "deleted" map of tombstones records removals with their time. That
+// is what stops a stale browser from resurrecting an item deleted in
+// another browser — the merge rule is: a tombstone newer than the
+// item's addedAt wins; re-adding an item stamps a fresh addedAt and
+// clears its tombstone. Older clients keep working against the legacy
+// view (no addedAt, titles as plain strings), and their writes
+// preserve the stored tombstones and stamps.
+function normalizeWishlist(raw) {
+  let obj = raw;
+  if (typeof raw === "string") { try { obj = JSON.parse(raw); } catch { obj = null; } }
+  if (!obj || typeof obj !== "object") obj = {};
+  const items = (Array.isArray(obj.items) ? obj.items : []).map(cleanWishlistItem).filter(Boolean).slice(0, 500);
+  const titles = [];
+  const seenTitles = new Set();
+  for (const t of Array.isArray(obj.titles) ? obj.titles : []) {
+    const c = cleanWishlistTitle(t);
+    if (!c) continue;
+    const key = c.text.toLowerCase();
+    if (seenTitles.has(key)) continue;
+    seenTitles.add(key);
+    titles.push(c);
+    if (titles.length >= 200) break;
+  }
+  return { items, titles, deleted: cleanDeleted(obj.deleted) };
+}
+function legacyWishlistView(v2) {
+  return {
+    items: v2.items.map(({ addedAt, ...rest }) => rest),
+    titles: v2.titles.map((t) => t.text),
+  };
 }
 async function handleAuth(request, env, url) {
   if (request.method === "OPTIONS") {
@@ -595,17 +693,189 @@ async function handleAuth(request, env, url) {
     if (!s) return jsonResponse({ error: "Not signed in" }, 401, request);
     if (request.method === "GET") {
       const raw = await env.SEFORIM_KV.get(`wish:${s.sub}`);
-      return jsonResponse(raw ? JSON.parse(raw) : { items: [], titles: [] }, 200, request);
+      const v2 = normalizeWishlist(raw);
+      return jsonResponse(url.searchParams.get("v") === "2" ? v2 : legacyWishlistView(v2), 200, request);
     }
     if (request.method === "PUT") {
       let body;
       try { body = await request.json(); } catch { return jsonResponse({ error: "Bad request" }, 400, request); }
-      const cleaned = cleanWishlist(body);
+      const prior = normalizeWishlist(await env.SEFORIM_KV.get(`wish:${s.sub}`));
+      const cleaned = normalizeWishlist(body);
+      const isV2 = url.searchParams.get("v") === "2" || (body && typeof body === "object" &&
+        ("deleted" in body || (Array.isArray(body.titles) && body.titles.some((t) => t && typeof t === "object"))));
+      if (!isV2) {
+        // A legacy client's list carries no tombstones; keep the
+        // stored ones (and any known addedAt stamps) so its write
+        // cannot undo a deletion made in a newer browser.
+        cleaned.deleted = prior.deleted;
+        const priorAdded = new Map(prior.items.map((i) => [i.url, i.addedAt]));
+        for (const i of cleaned.items) if (!i.addedAt && priorAdded.has(i.url)) i.addedAt = priorAdded.get(i.url);
+      }
       await env.SEFORIM_KV.put(`wish:${s.sub}`, JSON.stringify(cleaned));
-      return jsonResponse(cleaned, 200, request);
+      return jsonResponse(url.searchParams.get("v") === "2" ? cleaned : legacyWishlistView(cleaned), 200, request);
     }
   }
   return jsonResponse({ error: "Not found" }, 404, request);
+}
+
+// ---------------------------------------------------------------------------
+// New-releases feed (the homepage "New & just in" strip) and the
+// passive price log.
+// ---------------------------------------------------------------------------
+// The feed is built ONLY from sources that are open under safe mode:
+// Hamafitz's "Just Arrived" page (its robots.txt disallows only
+// pagination/sort parameters; the bare page-1 URL is what is
+// requested), SeforimDeals' new-books collection (default order — its
+// robots.txt disallows sort_by, so none is ever sent), and Kehot's
+// "Complete New Books" department (its robots.txt is effectively
+// empty). Feldheim, Greenfield, Eichler's and SeforimPlace are never
+// fetched for the feed. The blob lives in KV (key "feed:new-releases")
+// and refreshes lazily: a request that finds it missing or older than
+// 12 hours rebuilds it, so the feed costs at most six store-page
+// fetches a day however many visitors the homepage gets. Items keep
+// the date they were first seen and drop off 45 days after that; the
+// strip holds at most 30.
+
+const FEED_SOURCES = [
+  { storeId: "hamafitz", storeName: "Hamafitz", url: "https://hamafitz.com/index.php?route=product/module&path=34", parser: "opencartClassic", cap: 15 },
+  { storeId: "seforimdeals", storeName: "SeforimDeals", url: "https://seforimdeals.com/collections/new-books-seforim-%D7%A1%D7%A4%D7%A8%D7%99%D7%9D-%D7%97%D7%93%D7%A9%D7%99%D7%9D", parser: "shopify", cap: 24 },
+  { storeId: "kehot", storeName: "Kehot", url: "https://store.kehotonline.com/products.asp?dept=785&val=0&pagenumber=1", parser: "kehot", cap: 25 },
+];
+const FEED_TTL_MS = 12 * 3600 * 1000;
+const FEED_KEEP_MS = 45 * 24 * 3600 * 1000;
+// Bump when the blob's shape or balancing rules change: a stored blob
+// with an older version counts as stale and is rebuilt on the next
+// request, so a fix like this takes effect at once instead of up to
+// 12 hours later.
+const FEED_VERSION = 2;
+
+// Balance the strip across its stores: group by store, newest first
+// inside each group, then take one item from each store in turn.
+// Without this, whichever source is fetched first would fill the
+// whole strip on the first build, when every item shares a firstSeen.
+function interleaveFeed(items) {
+  const order = FEED_SOURCES.map((s) => s.storeId);
+  const groups = new Map();
+  for (const item of items ?? []) {
+    if (!groups.has(item.storeId)) groups.set(item.storeId, []);
+    groups.get(item.storeId).push(item);
+  }
+  for (const list of groups.values()) list.sort((a, b) => (b.firstSeen ?? 0) - (a.firstSeen ?? 0));
+  const keys = [...groups.keys()].sort((a, b) => {
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  const out = [];
+  let progressed = true;
+  while (progressed) {
+    progressed = false;
+    for (const k of keys) {
+      const next = groups.get(k).shift();
+      if (next) { out.push(next); progressed = true; }
+    }
+  }
+  return out;
+}
+
+function parseFeedSource(src, text) {
+  if (src.parser === "kehot") return parseKehot(text);
+  return parseForStore({ parser: src.parser }, text);
+}
+
+async function refreshFeed(env) {
+  const now = Date.now();
+  let prev = { generatedAt: 0, items: [] };
+  try {
+    const raw = await env.SEFORIM_KV.get("feed:new-releases");
+    if (raw) prev = JSON.parse(raw);
+  } catch { /* start fresh */ }
+  const prevByUrl = new Map((prev.items ?? []).map((i) => [i.url, i]));
+  const merged = new Map();
+  for (const src of FEED_SOURCES) {
+    try {
+      const res = await fetch(src.url, { headers: { "User-Agent": UA, "Accept": "text/html,*/*" } });
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (looksBotWalled(text)) continue;
+      for (const p of parseFeedSource(src, text).slice(0, src.cap)) {
+        if (!p.title || !p.url) continue;
+        const old = prevByUrl.get(p.url);
+        merged.set(p.url, { storeId: src.storeId, storeName: src.storeName, title: p.title, url: p.url,
+          priceText: p.priceText ?? null, priceAmount: p.priceAmount ?? null,
+          compareAtText: p.compareAtText ?? null, imageUrl: p.imageUrl ?? null,
+          firstSeen: old?.firstSeen ?? now, lastSeen: now });
+      }
+    } catch { /* one source failing never sinks the feed */ }
+  }
+  // Items a source did not show this time (rotated off its first page,
+  // or the source hiccuped) stay until they are 45 days old.
+  for (const item of prev.items ?? []) {
+    if (!merged.has(item.url) && now - (item.firstSeen ?? now) < FEED_KEEP_MS) merged.set(item.url, item);
+  }
+  const blob = { v: FEED_VERSION, generatedAt: now,
+    items: [...merged.values()].sort((a, b) => (b.firstSeen ?? 0) - (a.firstSeen ?? 0)).slice(0, 60) };
+  try { await env.SEFORIM_KV.put("feed:new-releases", JSON.stringify(blob)); } catch { /* serve it anyway */ }
+  return blob;
+}
+
+async function getFeed(env, ctx) {
+  let blob = null;
+  try {
+    const raw = await env.SEFORIM_KV.get("feed:new-releases");
+    if (raw) blob = JSON.parse(raw);
+  } catch { /* treat as missing */ }
+  if (!blob || blob.v !== FEED_VERSION || Date.now() - (blob.generatedAt ?? 0) > FEED_TTL_MS) {
+    const refreshing = refreshFeed(env);
+    if (!blob || blob.v !== FEED_VERSION) blob = await refreshing; // nothing usable yet: wait for the build
+    else if (ctx?.waitUntil) ctx.waitUntil(refreshing);            // serve the stale copy, refresh behind it
+    else blob = await refreshing;
+  }
+  if (!blob) return { generatedAt: 0, items: [] };
+  return { generatedAt: blob.generatedAt ?? 0, items: interleaveFeed(blob.items).slice(0, 30) };
+}
+
+// Passive price log: every search this worker answers anyway leaves a
+// trace of the prices it saw — one KV key per store ("ph:<storeId>")
+// holding { "<product url>": { title, last, lastSeen, hist } }, hist
+// being recent [timestamp, price] pairs, newest last. It adds NO
+// store traffic; the log is a by-product of searches already made,
+// and it is the raw material for the future price-tracking and
+// sale-pattern features (nothing reads it yet). Writes are kept rare
+// on purpose: a store's map is written back only when a product is
+// new to it, a price changed, or an entry's lastSeen is over a week
+// old, and the map is pruned to its 400 most recently seen products.
+async function logPrices(env, results) {
+  if (!env?.SEFORIM_KV) return;
+  const now = Date.now();
+  for (const r of results ?? []) {
+    if (r.status !== "ok" || !r.products?.length) continue;
+    try {
+      const key = `ph:${r.storeId}`;
+      let map = {};
+      const raw = await env.SEFORIM_KV.get(key);
+      if (raw) map = JSON.parse(raw) ?? {};
+      let changed = false;
+      for (const p of r.products) {
+        if (p.priceAmount == null || !p.url) continue;
+        const e = map[p.url];
+        if (!e) {
+          map[p.url] = { title: p.title, last: p.priceAmount, lastSeen: now, hist: [[now, p.priceAmount]] };
+          changed = true;
+        } else if (e.last !== p.priceAmount) {
+          e.hist = [...(e.hist ?? []), [now, p.priceAmount]].slice(-20);
+          e.last = p.priceAmount; e.lastSeen = now; e.title = p.title;
+          changed = true;
+        } else if (now - (e.lastSeen ?? 0) > 7 * 24 * 3600 * 1000) {
+          e.lastSeen = now;
+          changed = true;
+        }
+      }
+      if (!changed) continue;
+      const entries = Object.entries(map)
+        .sort((a, b) => (b[1].lastSeen ?? 0) - (a[1].lastSeen ?? 0)).slice(0, 400);
+      await env.SEFORIM_KV.put(key, JSON.stringify(Object.fromEntries(entries)));
+    } catch { /* logging must never break a search */ }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -625,6 +895,10 @@ export default {
     if (url.pathname === "/stores") {
       return jsonResponse({ stores: STORES.map((s) => ({ id: s.id, name: s.name, note: s.note ?? null })) }, 200, request);
     }
+    if (url.pathname === "/new-releases") {
+      if (!env.SEFORIM_KV) return jsonResponse({ generatedAt: 0, items: [] }, 200, request);
+      return jsonResponse(await getFeed(env, ctx), 200, request);
+    }
     // Any other path (including "/") with a ?q= runs a search; without
     // ?q= it returns the store list, so the worker URL alone is a
     // harmless health check.
@@ -643,6 +917,7 @@ export default {
       if (hit) return hit;
     }
     const results = await Promise.all(stores.map((s) => searchStoreWorker(s, q)));
+    if (ctx?.waitUntil) ctx.waitUntil(logPrices(env, results));
     const response = jsonResponse({ query: q, results });
     if (cache && ctx?.waitUntil) {
       const toCache = response.clone();

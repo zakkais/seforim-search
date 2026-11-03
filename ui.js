@@ -25,7 +25,7 @@
 // Searching stays open without signing in, and there is no checkout
 // and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./app.js?v=5";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./app.js?v=6";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
@@ -63,6 +63,7 @@ const I18N = {
     storesIncluded: "Stores · {n} of {total} included",
     save: "♡ Save", saved: "♥ Saved", remove: "Remove", onSale: "On sale", priceAtStore: "Price at store",
     scan: "Scan ISBN", scanTitle: "Scan an ISBN or QR code", scanHint: "Point the camera at the barcode on the back of the sefer.", scanUnsupported: "Scanning is not supported in this browser — type the ISBN into the search box instead.", cancel: "Cancel",
+    newReleases: "New & just in", shippingTax: "Shipping & tax", shipNote: "What each store itself publishes about its shipping and tax. Where a store publishes no rate, only its own checkout has the real number — this page doesn't guess.",
     resultsFor: "Results for “{q}”", listingsLoadedOne: "1 listing loaded", listingsLoadedOther: "{n} listings loaded",
     alsoSearchedFor: "Also searched for: ", searching: "Searching {stores}…",
     noListings: "No listings matched “{q}” at the included stores.",
@@ -88,6 +89,7 @@ const I18N = {
     storesIncluded: "חנויות · {n} מתוך {total} כלולות",
     save: "♡ שמור", saved: "♥ נשמר", remove: "הסר", onSale: "במבצע", priceAtStore: "מחיר בחנות",
     scan: "סריקת ISBN", scanTitle: "סריקת ISBN או קוד QR", scanHint: "כוונו את המצלמה אל הברקוד שבגב הספר.", scanUnsupported: "הסריקה אינה נתמכת בדפדפן זה — הקלידו את ה-ISBN בתיבת החיפוש.", cancel: "ביטול",
+    newReleases: "חדש והגיע", shippingTax: "משלוח ומס", shipNote: "מה שכל חנות מפרסמת בעצמה על המשלוח והמס שלה. חנות שלא מפרסמת מחיר — רק בקופה שלה יש את המספר האמיתי; העמוד הזה לא מנחש.",
     resultsFor: "תוצאות עבור “{q}”", listingsLoadedOne: "מודעה אחת נטענה", listingsLoadedOther: "{n} מודעות נטענו",
     alsoSearchedFor: "חיפשנו גם: ", searching: "מחפש ב־{stores}…",
     noListings: "לא נמצאו מודעות עבור “{q}” בחנויות הכלולות.",
@@ -113,6 +115,7 @@ const I18N = {
     storesIncluded: "קראָמען · {n} פֿון {total} אַרײַנגענומען",
     save: "♡ האַלטן", saved: "♥ געהאַלטן", remove: "אַראָפּנעמען", onSale: "אויף סעיל", priceAtStore: "פּרײַז אין קראָם",
     scan: "סקענען ISBN", scanTitle: "סקענען אַן ISBN אָדער QR קאָד", scanHint: "ווײַזט די קאַמעראַ אויפֿן באַרקאָד אויפֿן רוקן פֿונעם ספֿר.", scanUnsupported: "סקענען ווערט נישט געשטיצט אין דעם בלעטערער — טיפּט דעם ISBN אין דער זוך־קעסטל.", cancel: "אָפּזאָגן",
+    newReleases: "נײַ און פֿריש אָנגעקומען", shippingTax: "שיפּינג און שטײַער", shipNote: "וואָס יעדער קראָם גיט אַליין אָן וועגן זײַן שיפּינג און שטײַער. אַ קראָם וואָס גיט נישט אָן קיין פּרײַז — נאָר בײַם קאַסע איז דאָ דער עכטער נומער; דער בלאַט טרעפֿט נישט.",
     resultsFor: "רעזולטאַטן פֿאַר “{q}”", listingsLoadedOne: "1 ליסטינג געלאַדן", listingsLoadedOther: "{n} ליסטינגס געלאַדן",
     alsoSearchedFor: "אויך געזוכט: ", searching: "זוכן אין {stores}…",
     noListings: "קיין ליסטינגס האָבן נישט געפּאַסט “{q}” אין די אַרײַנגענומענע קראָמען.",
@@ -138,6 +141,7 @@ const I18N = {
     storesIncluded: "Tiendas · {n} de {total} incluidas",
     save: "♡ Guardar", saved: "♥ Guardado", remove: "Quitar", onSale: "En oferta", priceAtStore: "Precio en tienda",
     scan: "Escanear ISBN", scanTitle: "Escanea un ISBN o código QR", scanHint: "Apunta la cámara al código de barras en la parte trasera del libro.", scanUnsupported: "El escaneo no es compatible con este navegador: escribe el ISBN en el cuadro de búsqueda.", cancel: "Cancelar",
+    newReleases: "Novedades", shippingTax: "Envío e impuestos", shipNote: "Lo que cada tienda publica sobre sus envíos e impuestos. Si una tienda no publica tarifas, solo su caja tiene el número real: esta página no lo inventa.",
     resultsFor: "Resultados para “{q}”", listingsLoadedOne: "1 anuncio cargado", listingsLoadedOther: "{n} anuncios cargados",
     alsoSearchedFor: "También se buscó: ", searching: "Buscando en {stores}…",
     noListings: "Ningún anuncio coincidió con “{q}” en las tiendas incluidas.",
@@ -163,6 +167,7 @@ const I18N = {
     storesIncluded: "Boutiques · {n} sur {total} incluses",
     save: "♡ Enregistrer", saved: "♥ Enregistré", remove: "Retirer", onSale: "En solde", priceAtStore: "Prix en boutique",
     scan: "Scanner l'ISBN", scanTitle: "Scanner un ISBN ou un code QR", scanHint: "Pointez l'appareil photo vers le code-barres au dos du livre.", scanUnsupported: "La numérisation n'est pas prise en charge dans ce navigateur — saisissez l'ISBN dans la zone de recherche.", cancel: "Annuler",
+    newReleases: "Nouveautés", shippingTax: "Expédition et taxes", shipNote: "Ce que chaque boutique publie elle-même sur son expédition et ses taxes. Si une boutique ne publie aucun tarif, seule sa caisse donne le vrai montant — cette page ne devine pas.",
     resultsFor: "Résultats pour « {q} »", listingsLoadedOne: "1 annonce chargée", listingsLoadedOther: "{n} annonces chargées",
     alsoSearchedFor: "Aussi recherché : ", searching: "Recherche dans {stores}…",
     noListings: "Aucune annonce ne correspond à « {q} » dans les boutiques incluses.",
@@ -270,14 +275,74 @@ let activeVariants = [];
 let results = {}; // storeId -> StoreResult
 let runId = 0;
 
+// MERGE-BEGIN — pure wishlist-shape helpers (no DOM, no storage).
+// The wishlist lives in shape v2, here and on the server (see
+// worker.js): items and titles carry an addedAt stamp, and a
+// "deleted" map of tombstones remembers removals. The merge rule that
+// keeps browsers consistent: a tombstone newer than an entry's
+// addedAt wins, and re-adding an entry stamps a fresh addedAt and
+// clears its tombstone — so a deletion made in one browser is no
+// longer resurrected by a stale list in another. Lists saved by older
+// versions (plain title strings, no stamps) migrate with addedAt 0.
+function normalizeLocalWishlist(parsed) {
+  const src = parsed && typeof parsed === "object" ? parsed : {};
+  const items = (Array.isArray(src.items) ? src.items : [])
+    .filter((i) => i && i.url && i.title)
+    .map((i) => ({ ...i, addedAt: Number.isFinite(+i.addedAt) ? +i.addedAt : 0 }));
+  const titles = [];
+  const seen = new Set();
+  for (const t of Array.isArray(src.titles) ? src.titles : []) {
+    const c = typeof t === "string" ? { text: t, addedAt: 0 }
+      : (t && t.text ? { text: String(t.text), addedAt: Number.isFinite(+t.addedAt) ? +t.addedAt : 0 } : null);
+    if (!c || !c.text) continue;
+    const key = c.text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    titles.push(c);
+  }
+  const deleted = { urls: {}, titles: {} };
+  if (src.deleted && typeof src.deleted === "object") {
+    for (const [k, v] of Object.entries(src.deleted.urls ?? {})) {
+      if (Number.isFinite(+v) && +v > 0) deleted.urls[k] = +v;
+    }
+    for (const [k, v] of Object.entries(src.deleted.titles ?? {})) {
+      if (Number.isFinite(+v) && +v > 0) deleted.titles[String(k).toLowerCase()] = +v;
+    }
+  }
+  return { items, titles, deleted };
+}
+function mergeDeletedMaps(a, b) {
+  const out = { urls: {}, titles: {} };
+  for (const src of [a, b]) {
+    if (!src) continue;
+    for (const [k, v] of Object.entries(src.urls ?? {})) out.urls[k] = Math.max(out.urls[k] ?? 0, +v || 0);
+    for (const [k, v] of Object.entries(src.titles ?? {})) out.titles[k] = Math.max(out.titles[k] ?? 0, +v || 0);
+  }
+  return out;
+}
+function mergeWishlists(a, b) {
+  const deleted = mergeDeletedMaps(a?.deleted, b?.deleted);
+  const byUrl = new Map();
+  for (const src of [a, b]) for (const i of src?.items ?? []) {
+    const cur = byUrl.get(i.url);
+    if (!cur || (i.addedAt ?? 0) >= (cur.addedAt ?? 0)) byUrl.set(i.url, i);
+  }
+  const items = [...byUrl.values()].filter((i) => (deleted.urls[i.url] ?? 0) <= (i.addedAt ?? 0));
+  const byTitle = new Map();
+  for (const src of [a, b]) for (const t of src?.titles ?? []) {
+    const key = t.text.toLowerCase();
+    const cur = byTitle.get(key);
+    if (!cur || (t.addedAt ?? 0) >= (cur.addedAt ?? 0)) byTitle.set(key, t);
+  }
+  const titles = [...byTitle.values()].filter((t) => (deleted.titles[t.text.toLowerCase()] ?? 0) <= (t.addedAt ?? 0));
+  return { items, titles, deleted };
+}
+// MERGE-END
+
 function loadWishlist() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(LS_WISHLIST) || "{}");
-    return {
-      items: Array.isArray(parsed.items) ? parsed.items : [],
-      titles: Array.isArray(parsed.titles) ? parsed.titles : [],
-    };
-  } catch { return { items: [], titles: [] }; }
+    return normalizeLocalWishlist(JSON.parse(localStorage.getItem(LS_WISHLIST) || "{}"));
+  } catch { return { items: [], titles: [], deleted: { urls: {}, titles: {} } }; }
 }
 let wishlist = loadWishlist();
 const productByUrl = new Map(); // url -> { product, store }
@@ -302,13 +367,15 @@ function toggleWish(url) {
   const idx = wishlist.items.findIndex((i) => i.url === url);
   if (idx >= 0) {
     wishlist.items.splice(idx, 1);
+    wishlist.deleted.urls[url] = Date.now();
   } else if (found) {
     const { product, store } = found;
     wishlist.items.unshift({
       url: product.url, title: product.title, imageUrl: product.imageUrl || null,
       priceText: product.priceText || null, compareAtText: product.compareAtText || null,
-      storeId: store.id, storeName: store.name,
+      storeId: store.id, storeName: store.name, addedAt: Date.now(),
     });
+    delete wishlist.deleted.urls[url];
   }
   saveWishlist();
   if (!$("#wishlist-view").classList.contains("d-none")) renderWishlist();
@@ -316,17 +383,19 @@ function toggleWish(url) {
 }
 
 function addWishTitle(title) {
-  const t = String(title || "").trim();
-  if (!t) return;
-  if (!wishlist.titles.some((x) => x.toLowerCase() === t.toLowerCase())) {
-    wishlist.titles.unshift(t);
+  const text = String(title || "").trim();
+  if (!text) return;
+  if (!wishlist.titles.some((x) => x.text.toLowerCase() === text.toLowerCase())) {
+    wishlist.titles.unshift({ text, addedAt: Date.now() });
   }
+  delete wishlist.deleted.titles[text.toLowerCase()];
   saveWishlist();
   renderWishlist();
 }
 
 function removeWishTitle(title) {
-  wishlist.titles = wishlist.titles.filter((x) => x !== title);
+  wishlist.titles = wishlist.titles.filter((x) => x.text !== title);
+  wishlist.deleted.titles[String(title).toLowerCase()] = Date.now();
   saveWishlist();
   renderWishlist();
 }
@@ -457,6 +526,7 @@ function renderResults() {
     html += `<div class="alert alert-light border text-secondary mt-3" role="note">${t("noListings", { q: esc(activeQuery) })}</div>`;
   }
   section.innerHTML = html;
+  updateFeedVisibility();
 }
 
 // ---------------------------------------------------------------------------
@@ -470,7 +540,7 @@ const workerFetch = (path, opts = {}) =>
 async function pushWishlistToServer() {
   if (!signedInUser || !WORKER_URL) return;
   try {
-    await workerFetch("/api/wishlist", {
+    await workerFetch("/api/wishlist?v=2", {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(wishlist),
     });
@@ -480,20 +550,13 @@ async function pushWishlistToServer() {
 async function syncWishlistFromServer() {
   if (!WORKER_URL) return;
   try {
-    const res = await workerFetch("/api/wishlist");
+    const res = await workerFetch("/api/wishlist?v=2");
     if (!res.ok) return;
-    const server = await res.json();
-    const seenUrls = new Set(wishlist.items.map((i) => i.url));
-    for (const i of server.items || []) {
-      if (i.url && !seenUrls.has(i.url)) { wishlist.items.push(i); seenUrls.add(i.url); }
-    }
-    const seenTitles = new Set(wishlist.titles.map((t) => t.toLowerCase()));
-    for (const t of server.titles || []) {
-      if (t && !seenTitles.has(String(t).toLowerCase())) { wishlist.titles.push(t); seenTitles.add(String(t).toLowerCase()); }
-    }
-    saveWishlist();
+    const server = normalizeLocalWishlist(await res.json());
+    wishlist = mergeWishlists(wishlist, server);
+    saveWishlist(); // also pushes the merged list back, fire-and-forget
     if (!$("#wishlist-view").classList.contains("d-none")) renderWishlist();
-    await pushWishlistToServer();
+    renderResults();
   } catch { /* stay local */ }
 }
 
@@ -557,10 +620,10 @@ function renderWishlist() {
   const itemsWrap = $("#wish-items");
   titlesWrap.innerHTML = wishlist.titles.length
     ? `<p class="text-secondary small mb-2">${t("titlesToLookUp")}</p>` +
-      wishlist.titles.map((t) => `
+      wishlist.titles.map((wt) => `
         <div class="list-group-item d-flex justify-content-between align-items-center gap-2 px-3 py-2">
-          <button type="button" class="btn p-0 text-start fw-medium flex-grow-1" data-wish-title="${esc(t)}">${esc(t)}</button>
-          <button type="button" class="btn btn-sm text-secondary" data-wish-title-remove="${esc(t)}" aria-label="Remove ${esc(t)}">✕</button>
+          <button type="button" class="btn p-0 text-start fw-medium flex-grow-1" data-wish-title="${esc(wt.text)}">${esc(wt.text)}</button>
+          <button type="button" class="btn btn-sm text-secondary" data-wish-title-remove="${esc(wt.text)}" aria-label="Remove ${esc(wt.text)}">✕</button>
         </div>`).join("")
     : "";
   if (wishlist.items.length) {
@@ -593,6 +656,7 @@ function showWishlist() {
   $("#results").classList.add("d-none");
   $("#idle-state").classList.add("d-none");
   $("#wishlist-view").classList.remove("d-none");
+  updateFeedVisibility();
   closeNavPanel();
 }
 
@@ -600,6 +664,42 @@ function showSearchView() {
   $("#wishlist-view").classList.add("d-none");
   $("#results").classList.remove("d-none");
   renderResults();
+}
+
+// ---------------------------------------------------------------------------
+// New-releases feed
+// ---------------------------------------------------------------------------
+// The worker keeps a "New & just in" list (GET /new-releases, built
+// from Hamafitz, SeforimDeals and Kehot under safe mode — see
+// worker.js). It renders with the same product cards as the search
+// results, wishlist buttons included, on the homepage only: it hides
+// while a search is on screen or the wishlist is open. No data (or
+// no worker) means no section at all.
+
+let feedItems = [];
+
+function updateFeedVisibility() {
+  const sec = $("#new-releases");
+  if (!sec) return;
+  const wishlistOpen = !$("#wishlist-view").classList.contains("d-none");
+  sec.classList.toggle("d-none", !feedItems.length || Boolean(activeQuery) || wishlistOpen);
+}
+
+async function loadFeed() {
+  if (!WORKER_URL) return;
+  try {
+    const res = await fetch(`${WORKER_URL}/new-releases`);
+    if (!res.ok) return;
+    const data = await res.json();
+    feedItems = Array.isArray(data.items) ? data.items : [];
+    if (!feedItems.length) return;
+    $("#new-releases-grid").innerHTML = feedItems.map((p) => {
+      const store = { id: p.storeId, name: p.storeName };
+      productByUrl.set(p.url, { product: p, store });
+      return `<div class="col">${productCard(store, p, "save")}</div>`;
+    }).join("");
+    updateFeedVisibility();
+  } catch { /* the strip is a bonus; the search box is the site */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -774,6 +874,9 @@ document.addEventListener("DOMContentLoaded", () => {
   renderWishlistCount();
 
   $("#wishlist-nav-btn").addEventListener("click", showWishlist);
+  const shipBtn = $("#ship-nav-btn");
+  if (shipBtn) shipBtn.addEventListener("click", closeNavPanel);
+  loadFeed();
   $("#back-to-search").addEventListener("click", showSearchView);
   $("#signout-btn").addEventListener("click", async () => {
     try { await workerFetch("/auth/logout", { method: "POST" }); } catch { /* ignore */ }
