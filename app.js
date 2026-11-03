@@ -178,7 +178,7 @@ const HEBREW_BRIDGE = [
   ["mishnah", ["משנה"], "mishna"],
   ["mishnayos", ["משניות"], "mishnayot"],
   ["berurah", ["ברורה"], "berura", "brurah"],
-  ["shulchan", ["שולחן"], "shulhan"],
+  ["shulchan", ["שולחן"], "shulhan", "שלחן"],
   ["aruch", ["ערוך"], "arukh", "oruch"],
   ["hilchos", ["הלכות"], "halachos", "halachot", "hilchot", "halacha", "halochos"],
   ["torah", ["תורה"]],
@@ -1131,6 +1131,43 @@ function matchCandidates(entries, groups) {
   return out.slice(0, 16);
 }
 
+// ---------------------------------------------------------------------------
+// Relevance filtering
+// ---------------------------------------------------------------------------
+// Some stores' search is OR-loose: "minchas elazar" returns every
+// "Minchas …" and every "… Elazar" on the site (145 listings, most of
+// them irrelevant). Ranking alone cannot fix a flood like that, so
+// for a multi-word query the merged results are FILTERED before
+// display: a listing stays only if its title matches every query
+// word (canonicalized through the Hebrew bridge, with the same
+// edit-distance tolerance the ranker uses, so spelling variants
+// count). When too few listings match every word, one-word-short
+// matches are kept instead; single-word queries are never filtered.
+// ---------------------------------------------------------------------------
+const SEARCH_FILTER_STOPWORDS = new Set([
+  "the", "a", "an", "of", "for", "with", "and", "or", "in", "on",
+  "sefer", "book", "books", "edition", "editions",
+]);
+function filterRelevant(products, query) {
+  const foldShut = (s) => String(s || "").replace(/שו["'׳״]ת/g, " shut ");
+  const qWords = [...new Set(canonWords(normWords(foldShut(query)))
+    .filter((w) => !SEARCH_FILTER_STOPWORDS.has(w)))];
+  if (qWords.length < 2) return products;
+  const matchedCount = (title) => {
+    const tWords = canonWords(normWords(foldShut(title)));
+    return qWords.reduce((n, w) => {
+      const tol = Math.max(1, Math.floor(w.length / 3));
+      return n + (tWords.some((tw) => levenshtein(w, tw) <= tol) ? 1 : 0);
+    }, 0);
+  };
+  const full = products.filter((p) => matchedCount(p.title) === qWords.length);
+  // Four or more full matches are a real result set — returning the
+  // one-word-short flood alongside them would defeat the filter.
+  if (full.length >= 4) return full;
+  const near = products.filter((p) => matchedCount(p.title) >= qWords.length - 1);
+  return near.length ? near : products;
+}
+
 export {
   MAX_PER_STORE,
   STORES,
@@ -1153,5 +1190,6 @@ export {
   productSignature,
   signaturesConflict,
   groupProducts,
-  matchCandidates
+  matchCandidates,
+  filterRelevant
 };

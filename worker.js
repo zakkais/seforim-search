@@ -397,9 +397,9 @@ function parseKehot(html) {
 // and fetchStoreText — those two functions hold the paging logic that
 // lets each store return more than its first page.
 // ---------------------------------------------------------------------------
-function targetUrlFor(store, query) {
+function targetUrlFor(store, query, light) {
   if (store.parser === "wooStoreApi") {
-    return `https://www.esicha.org/wp-json/wc/store/v1/products?search=${enc(query)}&per_page=${MAX_PER_STORE}`;
+    return `https://www.esicha.org/wp-json/wc/store/v1/products?search=${enc(query)}&per_page=${light ? 25 : MAX_PER_STORE}`;
   }
   return store.searchUrl(query);
 }
@@ -448,13 +448,19 @@ function mergeAcrossPages(lists) {
   }
   return out;
 }
-async function searchStoreWorker(store, query, env, ctx) {
+async function searchStoreWorker(store, query, env, ctx, opts = {}) {
+  // opts.light (chat grounding): first page only, no stock annotation.
+  // A chat invocation searches all six stores at once, and the full
+  // path — extra pages plus up to 40 stock fetches — blew past the
+  // platform's 50-subrequest limit, which surfaced as the AI call
+  // itself failing ("Too many subrequests") on big result sets.
+  const light = !!opts.light;
   const base = { storeId: store.id, storeName: store.name, searchUrl: store.searchUrl(query) };
   // Magento gets one big request instead of paging: its limit parameter
   // is honoured by the Magento stores.
   const firstUrl = store.parser === "magento"
     ? `${store.searchUrl(query)}&product_list_limit=${MAX_PER_STORE}`
-    : targetUrlFor(store, query);
+    : targetUrlFor(store, query, light);
   const got = await fetchStoreText(store, firstUrl);
   if (!got.ok) {
     return { ...base, status: "error",
@@ -473,7 +479,7 @@ async function searchStoreWorker(store, query, env, ctx) {
   let products = parseForStore(store, text);
   // Remaining pages are fetched in parallel, not one after another, so
   // gathering up to 100 listings costs roughly one page-fetch of time.
-  const extra = extraPageUrls(store, query);
+  const extra = light ? null : extraPageUrls(store, query);
   if (extra && products.length > 0) {
     const pages = await Promise.all(extra.map(async (url) => {
       try {
@@ -491,7 +497,7 @@ async function searchStoreWorker(store, query, env, ctx) {
       if (res.ok) products = parseShopifySuggest(await res.text());
     } catch { /* keep empty */ }
   }
-  if (store.id === "seforimdeals" && env && products.length > 0) {
+  if (!light && store.id === "seforimdeals" && env && products.length > 0) {
     // Annotate sold-out state per product (see getDealsStock). A
     // handle whose state can't be determined stays unmarked.
     const handles = [...new Set(products.map((p) => /\/products\/([^/?#]+)/.exec(p.url || "")?.[1]).filter(Boolean))];
@@ -991,6 +997,105 @@ async function chatCount(env, key) {
 }
 
 // ---------------------------------------------------------------------------
+// Chat grounding helpers: product-page details + ChabadLibrary sources
+// ---------------------------------------------------------------------------
+// The first chat version grounded answers in listing titles and
+// prices only, which cannot answer "what is the difference between
+// X and Y" — the model could see two titles and nothing else. These
+// helpers fetch two more fact layers, each fail-silent:
+//  (a) the top listings' own product pages (publisher/vendor,
+//      description, variant options) from the stores the site
+//      already works with, and
+//  (b) ChabadLibrary phrase search over the Rebbe's seforim and
+//      Likkutei Sichos (public API; see AGENTS.md) — real excerpts,
+//      each with its sefer > section breadcrumb and a public link.
+// ---------------------------------------------------------------------------
+function stripHtmlText(s, cap) {
+  return String(s || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&#39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().slice(0, cap || 700);
+}
+
+async function fetchTextTimeout(url, ms) {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms || 4500);
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, Accept: "text/html,application/json" },
+      signal: ctrl.signal, redirect: "follow",
+    });
+    clearTimeout(timer);
+    if (!res.ok) return "";
+    return await res.text();
+  } catch { return ""; }
+}
+
+async function chatProductDetail(p) {
+  try {
+    const u = new URL(p.url);
+    if (u.hostname.includes("seforimdeals.com") && u.pathname.startsWith("/products/")) {
+      const raw = await fetchTextTimeout(`${u.origin}${u.pathname}.js`, 4000);
+      if (raw) {
+        const j = JSON.parse(raw);
+        const parts = [];
+        if (j.vendor) parts.push(`publisher/vendor: ${j.vendor}`);
+        const desc = stripHtmlText(j.description || "", 650);
+        if (desc) parts.push(desc);
+        if (Array.isArray(j.variants) && j.variants.length > 1) {
+          parts.push(`variants: ${j.variants.slice(0, 6).map((v) => v.title).join(" / ")}`);
+        }
+        if (parts.length) return parts.join(" — ");
+      }
+    }
+    const html = await fetchTextTimeout(p.url, 4500);
+    if (!html) return "";
+    const meta = html.match(/<meta[^>]+(?:name|property)="(?:description|og:description)"[^>]+content="([^"]+)"/i) ||
+      html.match(/<meta[^>]+content="([^"]+)"[^>]+(?:name|property)="(?:description|og:description)"/i);
+    let desc = meta ? stripHtmlText(meta[1], 650) : "";
+    if (!desc) {
+      const ld = html.match(/"description"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      if (ld) desc = stripHtmlText(ld[1].replace(/\\n/g, " ").replace(/\\"/g, '"'), 650);
+    }
+    return desc;
+  } catch { return ""; }
+}
+
+const CHAT_HEBREW_STOPWORDS = new Set(["מי", "מה", "מתי", "למה", "איך", "האם", "כמה", "את", "על", "של", "הוא", "היא", "כתב", "חיבר", "נדפס", "הוציא", "בין", "לבין"]);
+
+async function chatLibrarySources(question) {
+  const runs = (String(question || "").match(/[\u0590-\u05FF][\u0590-\u05FF"׳״' -]*/g) || [])
+    .map((s) => s.trim()).filter((s) => s.length >= 2);
+  // Phrase search is exact: question words ("who wrote the…") match
+  // nothing, so drop them and search the sefer terms that remain —
+  // "מי כתב את ספר התניא" becomes the phrase "ספר התניא".
+  const words = runs.length
+    ? runs.join(" ").split(/\s+/).filter((w) => !CHAT_HEBREW_STOPWORDS.has(w))
+    : [];
+  const phrase = words.slice(0, 3).join(" ");
+  if (!phrase) return [];
+  const out = [];
+  for (const section of ["1100000000", "1300000000"]) {
+    if (out.length >= 3) break;
+    const raw = await fetchTextTimeout(
+      `https://chabadlibrary.org/books/api/search?phrase=${encodeURIComponent(phrase)}&section_id=${section}&offset=0`, 5000);
+    if (!raw) continue;
+    try {
+      const j = JSON.parse(raw);
+      for (const r of (j.results || []).slice(0, 2)) {
+        const text = stripHtmlText(r.text || "", 420);
+        if (!text) continue;
+        out.push(`- From ${r.tree || "ChabadLibrary"}: "${text}" — https://chabadlibrary.org/books/${r.mafteach_id}`);
+        if (out.length >= 3) break;
+      }
+    } catch { /* ignore */ }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Match check for grouped cards (Workers AI)
 // ---------------------------------------------------------------------------
 // POST /match { pairs: [{a:{title,store,price}, b:{...}}] } ->
@@ -1099,10 +1204,11 @@ async function handleChat(request, env, ctx) {
   // keep the closest-matching listings as the model's only facts.
   // (These searches also feed the passive price log, like any other.)
   let contextLines = [];
+  let topListings = [];
   const terms = chatSearchTerms(question);
   if (terms) {
     try {
-      const results = await Promise.all(STORES.map((s) => searchStoreWorker(s, terms, env, ctx)));
+      const results = await Promise.all(STORES.map((s) => searchStoreWorker(s, terms, env, ctx, { light: true })));
       if (ctx?.waitUntil) ctx.waitUntil(logPrices(env, results));
       const words = terms.toLowerCase().split(/\s+/);
       const scored = [];
@@ -1115,38 +1221,79 @@ async function handleChat(request, env, ctx) {
         }
       }
       scored.sort((a, b) => b.score - a.score || ((a.p.priceAmount ?? 1e9) - (b.p.priceAmount ?? 1e9)));
-      contextLines = scored.slice(0, 8).map(({ p, storeName }) =>
+      topListings = scored.slice(0, 8);
+      contextLines = topListings.map(({ p, storeName }) =>
         `- ${p.title} — ${storeName}: ${p.priceText || "price shown at the store"}${p.compareAtText ? ` (list price ${p.compareAtText})` : ""}${p.soldOut ? " — SOLD OUT at this store" : ""} — ${p.url}`);
     } catch { /* no context; the prompt below handles that case */ }
   }
 
+  // Second grounding layer: product-page details for the closest
+  // listings, and ChabadLibrary excerpts when the question carries
+  // Hebrew sefer terms. Both run in parallel under a deadline — if
+  // they are slow, the answer proceeds from the listings alone
+  // rather than timing out (a Hebrew question timed out without
+  // this guard).
+  let sourceLines = [];
+  const plainLines = [...contextLines];
+  try {
+    const enrich = (async () => {
+      const [details, sources] = await Promise.all([
+        Promise.all(topListings.slice(0, 4).map(({ p }) => chatProductDetail(p))),
+        chatLibrarySources(question),
+      ]);
+      return { details, sources };
+    })();
+    const deadline = new Promise((resolve) => setTimeout(() => resolve(null), 9000));
+    const got = await Promise.race([enrich, deadline]);
+    if (got) {
+      got.details.forEach((d, i) => { if (d) contextLines[i] += `\n  Details: ${d}`; });
+      sourceLines = got.sources;
+    }
+  } catch { /* listings-only context still stands */ }
+
   const system = [
     "You are the chat assistant for Seforim Search, a site that searches Jewish bookstores (seforim stores). This is a prototype.",
-    "Answer ONLY from the listing facts provided below. Never invent a price, a volume count, an author, a date, or any other fact.",
-    "If the listings do not answer the question, say plainly that this prototype can only answer from current store listings and cannot verify that yet.",
-    "When you use a listing, name its store. Keep answers short: two to four sentences. Answer in the language the question was asked in.",
+    "Answer ONLY from the facts provided below: store listings (some with product-page details) and, when present, source excerpts. Never invent a price, a volume count, a publisher, an author, a date, or any other fact.",
+    "When comparing seforim or explaining the difference between them, use only the details actually stated — title, volumes, size, publisher/vendor, description, price, stock — and say which relevant details are not stated.",
+    "When you use a listing, name its store. When you use a source excerpt, name the sefer and section it comes from and include its link.",
+    "If the provided facts do not answer the question, say plainly what you could not verify instead of guessing.",
+    "Keep answers focused: usually two to five sentences, or a short list when comparing. Answer in the language the question was asked in.",
     "Prices are the stores' current listing prices and can change; say so when an answer turns on a price.",
   ].join(" ");
-  const userMsg = `Question: ${question}\n\nListings found${terms ? ` for "${terms}"` : ""}:\n${contextLines.length ? contextLines.join("\n") : "(none)"}`;
-  try {
+  const listingsPart = `Question: ${question}\n\nListings found${terms ? ` for "${terms}"` : ""}:\n`;
+  const userMsg = listingsPart + (contextLines.length ? contextLines.join("\n") : "(none)") +
+    (sourceLines.length ? `\n\nSource excerpts:\n${sourceLines.join("\n")}` : "");
+  const plainMsg = listingsPart + (plainLines.length ? plainLines.join("\n") : "(none)");
+  // Workers AI answers in one of two shapes depending on the model:
+  // the classic { response } or an OpenAI-style chat completion
+  // ({ choices: [{ message: { content } }] }). Read both.
+  const askModel = async (msg) => {
     const out = await env.AI.run(CHAT_MODEL, {
-      messages: [{ role: "system", content: system }, { role: "user", content: userMsg }],
-      max_tokens: 400,
+      messages: [{ role: "system", content: system }, { role: "user", content: msg }],
+      // 320, not more: at 550 the binding call timed out on questions
+      // whose answers enumerate many listings (tanya, siddur) while
+      // short answers passed — generation length was the difference.
+      max_tokens: 320,
     });
-    // Workers AI answers in one of two shapes depending on the model:
-    // the classic { response } or an OpenAI-style chat completion
-    // ({ choices: [{ message: { content } }] }). Read both.
-    const answer = String(
+    const text = String(
       out?.response ||
       out?.choices?.[0]?.message?.content ||
       out?.result?.response ||
       out?.result?.choices?.[0]?.message?.content ||
       ""
     ).trim();
-    if (!answer) throw new Error("empty answer");
-    return jsonResponse({ answer }, 200, request, noStore);
+    if (!text) throw new Error("empty answer");
+    return text;
+  };
+  try {
+    return jsonResponse({ answer: await askModel(userMsg) }, 200, request, noStore);
   } catch {
-    return jsonResponse({ error: "The chat prototype could not answer just now — please try again." }, 502, request, noStore);
+    // One retry on the shorter listings-only context before giving up.
+    try {
+      return jsonResponse({ answer: await askModel(plainMsg) }, 200, request, noStore);
+    } catch {
+      return jsonResponse({ error: "The chat prototype could not answer just now — please try again." }, 502, request, noStore);
+    }
   }
 }
 

@@ -16,6 +16,12 @@
  * either file, delete it here rather than leaving it to confuse the
  * next reader. */
 
+/* Chat panel height follows the DYNAMIC viewport, so when a phone
+   keyboard opens the panel shrinks with the visible area instead of
+   its top sliding off-screen (with the viewport meta's
+   interactive-widget=resizes-content in index.html). */
+#chat-panel { height: 100dvh; max-height: 100dvh; }
+
 :root {
   --bg: #f6f2ea;
   --surface: #fffdf8;
@@ -27,13 +33,6 @@
   --gold: #a97c2f;
   --rust: #9a3b26;
 }
-
-/* Chat bubbles carry their own explicit colour pairs. The site's
-   dark scheme lightens --ink, which on the AI bubble's light ground
-   was unreadable on a phone in dark mode (Zakkai's screenshot,
-   2026-11-03) — so the bubbles never inherit theme colours. */
-.chat-bubble-ai { background-color: #f7f2e3; color: #262019; border: 1px solid #ddd3b8; color-scheme: light; }
-.chat-bubble-me { background-color: #12214d; color: #f7f2e3; color-scheme: light; }
 
 @media (prefers-color-scheme: dark) {
   :root {

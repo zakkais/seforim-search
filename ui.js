@@ -25,7 +25,7 @@
 // Searching stays open without signing in, and there is no checkout
 // and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates } from "./app.js?v=9";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant } from "./app.js?v=10";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
@@ -64,7 +64,7 @@ const I18N = {
     storesIncluded: "Stores · {n} of {total} included",
     save: "♡", saved: "♥", remove: "Remove", onSale: "On sale", soldOut: "Sold out", inStores: "In {n} stores", priceAtStore: "Price at store",
     scan: "Scan ISBN", scanTitle: "Scan an ISBN or QR code", scanHint: "Point the camera at the barcode on the back of the sefer.", scanUnsupported: "Scanning is not supported in this browser — type the ISBN into the search box instead.", cancel: "Cancel",
-    chatTitle: "Ask about a sefer", chatNote: "Prototype — it answers only from the stores' current listings, so it can compare prices and say what's sold out, but it can't answer history or authorship questions yet.", chatPlaceholder: "Ask about a sefer…", chatSend: "Send", chatWelcome: "Shalom! Ask me about a sefer — for example, which store has it cheapest, or whether it's sold out anywhere.", chatThinking: "Checking the stores…", chatError: "The chat couldn't answer just now — please try again.",
+    chatTitle: "Ask about a sefer", chatNote: "Prototype — it answers from the stores' listings and product pages, and checks ChabadLibrary when a question names a sefer in Hebrew. What it can't verify, it says so.", chatPlaceholder: "Ask about a sefer…", chatSend: "Send", backToTop: "Back to top", chatWelcome: "Shalom! Ask me about a sefer — for example, which store has it cheapest, or whether it's sold out anywhere.", chatThinking: "Checking the stores…", chatError: "The chat couldn't answer just now — please try again.",
     newReleases: "New & just in", shippingTax: "Shipping & tax", shipNote: "What each store itself publishes about its shipping and tax. Where a store publishes no rate, only its own checkout has the real number — this page doesn't guess.",
     resultsFor: "Results for “{q}”", listingsLoadedOne: "1 listing loaded", listingsLoadedOther: "{n} listings loaded",
     alsoSearchedFor: "Also searched for: ", searching: "Searching {stores}…",
@@ -91,7 +91,7 @@ const I18N = {
     storesIncluded: "חנויות · {n} מתוך {total} כלולות",
     save: "♡", saved: "♥", remove: "הסר", onSale: "במבצע", soldOut: "אזל מהמלאי", inStores: "ב-{n} חנויות", priceAtStore: "מחיר בחנות",
     scan: "סריקת ISBN", scanTitle: "סריקת ISBN או קוד QR", scanHint: "כוונו את המצלמה אל הברקוד שבגב הספר.", scanUnsupported: "הסריקה אינה נתמכת בדפדפן זה — הקלידו את ה-ISBN בתיבת החיפוש.", cancel: "ביטול",
-    chatTitle: "שאל על ספר", chatNote: "אב־טיפוס — עונה רק ממודעות החנויות הנוכחיות, כך שיוכל להשוות מחירים ולומר מה אזל מהמלאי, אך עדיין לא לענות על שאלות היסטוריה או מחבר.", chatPlaceholder: "שאל על ספר…", chatSend: "שלח", chatWelcome: "שלום! שאל אותי על ספר — למשל, באיזו חנות הוא הכי זול, או אם הוא אזל באיזו חנות.", chatThinking: "בודק בחנויות…", chatError: "הצ׳אט לא הצליח לענות כרגע — נסה שוב.",
+    chatTitle: "שאל על ספר", chatNote: "אב־טיפוס — עונה ממודעות החנויות ומדפי המוצר, ובשאלה שמזכירה ספר בעברית בודק גם ב-ChabadLibrary. מה שאינו יכול לאמת — הוא אומר זאת.", chatPlaceholder: "שאל על ספר…", chatSend: "שלח", backToTop: "חזרה למעלה", chatWelcome: "שלום! שאל אותי על ספר — למשל, באיזו חנות הוא הכי זול, או אם הוא אזל באיזו חנות.", chatThinking: "בודק בחנויות…", chatError: "הצ׳אט לא הצליח לענות כרגע — נסה שוב.",
     newReleases: "חדש והגיע", shippingTax: "משלוח ומס", shipNote: "מה שכל חנות מפרסמת בעצמה על המשלוח והמס שלה. חנות שלא מפרסמת מחיר — רק בקופה שלה יש את המספר האמיתי; העמוד הזה לא מנחש.",
     resultsFor: "תוצאות עבור “{q}”", listingsLoadedOne: "מודעה אחת נטענה", listingsLoadedOther: "{n} מודעות נטענו",
     alsoSearchedFor: "חיפשנו גם: ", searching: "מחפש ב־{stores}…",
@@ -118,7 +118,7 @@ const I18N = {
     storesIncluded: "קראָמען · {n} פֿון {total} אַרײַנגענומען",
     save: "♡", saved: "♥", remove: "אַראָפּנעמען", onSale: "אויף סעיל", soldOut: "אויספאַרקויפט", inStores: "אין {n} קראָמען", priceAtStore: "פּרײַז אין קראָם",
     scan: "סקענען ISBN", scanTitle: "סקענען אַן ISBN אָדער QR קאָד", scanHint: "ווײַזט די קאַמעראַ אויפֿן באַרקאָד אויפֿן רוקן פֿונעם ספֿר.", scanUnsupported: "סקענען ווערט נישט געשטיצט אין דעם בלעטערער — טיפּט דעם ISBN אין דער זוך־קעסטל.", cancel: "אָפּזאָגן",
-    chatTitle: "פֿרעגט וועגן אַ ספר", chatNote: "פּראָטאָטיפּ — ענטפֿערט נאָר פֿון די איצטיקע ליסטינגס פֿון די קראָמען, קען פֿאַרגלײַכן פּרײַזן און זאָגן וואָס איז אויספאַרקויפט, אָבער נאָך נישט ענטפֿערן אויף היסטאָריע אָדער מחבר־פֿראַגעס.", chatPlaceholder: "פֿרעגט וועגן אַ ספר…", chatSend: "שיקן", chatWelcome: "שלום! פֿרעגט מיך וועגן אַ ספר — למשל, אין וועלכער קראָם איז עס די ביליקסטע, אָדער צי עס איז ערגעץ אויספאַרקויפט.", chatThinking: "קוקט אין די קראָמען…", chatError: "דער טשאַט האָט איצט נישט געקענט ענטפֿערן — פּרוּווט נאָך אַ מאָל.",
+    chatTitle: "פֿרעגט וועגן אַ ספר", chatNote: "פּראָטאָטיפּ — ענטפֿערט פֿון די ליסטינגס און פּראָדוקט־בלעטער פֿון די קראָמען, און קוקט אין ChabadLibrary ווען די פֿראַגע רופט אַ ספר אויף העברעיִש. וואָס עס קען נישט באַשטעטיקן, זאָגט עס.", chatPlaceholder: "פֿרעגט וועגן אַ ספר…", chatSend: "שיקן", backToTop: "צוריק אַרויף", chatWelcome: "שלום! פֿרעגט מיך וועגן אַ ספר — למשל, אין וועלכער קראָם איז עס די ביליקסטע, אָדער צי עס איז ערגעץ אויספאַרקויפט.", chatThinking: "קוקט אין די קראָמען…", chatError: "דער טשאַט האָט איצט נישט געקענט ענטפֿערן — פּרוּווט נאָך אַ מאָל.",
     newReleases: "נײַ און פֿריש אָנגעקומען", shippingTax: "שיפּינג און שטײַער", shipNote: "וואָס יעדער קראָם גיט אַליין אָן וועגן זײַן שיפּינג און שטײַער. אַ קראָם וואָס גיט נישט אָן קיין פּרײַז — נאָר בײַם קאַסע איז דאָ דער עכטער נומער; דער בלאַט טרעפֿט נישט.",
     resultsFor: "רעזולטאַטן פֿאַר “{q}”", listingsLoadedOne: "1 ליסטינג געלאַדן", listingsLoadedOther: "{n} ליסטינגס געלאַדן",
     alsoSearchedFor: "אויך געזוכט: ", searching: "זוכן אין {stores}…",
@@ -145,7 +145,7 @@ const I18N = {
     storesIncluded: "Tiendas · {n} de {total} incluidas",
     save: "♡", saved: "♥", remove: "Quitar", onSale: "En oferta", soldOut: "Agotado", inStores: "En {n} tiendas", priceAtStore: "Precio en tienda",
     scan: "Escanear ISBN", scanTitle: "Escanea un ISBN o código QR", scanHint: "Apunta la cámara al código de barras en la parte trasera del libro.", scanUnsupported: "El escaneo no es compatible con este navegador: escribe el ISBN en el cuadro de búsqueda.", cancel: "Cancelar",
-    chatTitle: "Pregunta por un séfer", chatNote: "Prototipo: responde solo desde los listados actuales de las tiendas, así que puede comparar precios y decir qué está agotado, pero aún no puede responder preguntas de historia o autoría.", chatPlaceholder: "Pregunta por un séfer…", chatSend: "Enviar", chatWelcome: "¡Shalom! Pregúntame por un séfer: por ejemplo, en qué tienda está más barato o si está agotado en alguna.", chatThinking: "Revisando las tiendas…", chatError: "El chat no pudo responder ahora. Inténtalo de nuevo.",
+    chatTitle: "Pregunta por un séfer", chatNote: "Prototipo: responde desde los listados y las páginas de producto de las tiendas, y consulta ChabadLibrary cuando una pregunta nombra un séfer en hebreo. Lo que no puede verificar, lo dice.", chatPlaceholder: "Pregunta por un séfer…", chatSend: "Enviar", backToTop: "Volver arriba", chatWelcome: "¡Shalom! Pregúntame por un séfer: por ejemplo, en qué tienda está más barato o si está agotado en alguna.", chatThinking: "Revisando las tiendas…", chatError: "El chat no pudo responder ahora. Inténtalo de nuevo.",
     newReleases: "Novedades", shippingTax: "Envío e impuestos", shipNote: "Lo que cada tienda publica sobre sus envíos e impuestos. Si una tienda no publica tarifas, solo su caja tiene el número real: esta página no lo inventa.",
     resultsFor: "Resultados para “{q}”", listingsLoadedOne: "1 anuncio cargado", listingsLoadedOther: "{n} anuncios cargados",
     alsoSearchedFor: "También se buscó: ", searching: "Buscando en {stores}…",
@@ -172,7 +172,7 @@ const I18N = {
     storesIncluded: "Boutiques · {n} sur {total} incluses",
     save: "♡", saved: "♥", remove: "Retirer", onSale: "En solde", soldOut: "Épuisé", inStores: "Dans {n} boutiques", priceAtStore: "Prix en boutique",
     scan: "Scanner l'ISBN", scanTitle: "Scanner un ISBN ou un code QR", scanHint: "Pointez l'appareil photo vers le code-barres au dos du livre.", scanUnsupported: "La numérisation n'est pas prise en charge dans ce navigateur — saisissez l'ISBN dans la zone de recherche.", cancel: "Annuler",
-    chatTitle: "Demander un séfer", chatNote: "Prototype : répond uniquement à partir des listes actuelles des boutiques ; il peut comparer les prix et dire ce qui est épuisé, mais pas encore répondre aux questions d'histoire ou d'auteur.", chatPlaceholder: "Demandez un séfer…", chatSend: "Envoyer", chatWelcome: "Shalom ! Demandez-moi un séfer — par exemple, dans quelle boutique il est le moins cher, ou s'il est épuisé quelque part.", chatThinking: "Vérification des boutiques…", chatError: "Le chat n'a pas pu répondre. Réessayez.",
+    chatTitle: "Demander un séfer", chatNote: "Prototype : répond à partir des listes et des pages produits des boutiques, et consulte ChabadLibrary quand une question nomme un séfer en hébreu. Ce qu'il ne peut pas vérifier, il le dit.", chatPlaceholder: "Demandez un séfer…", chatSend: "Envoyer", backToTop: "Retour en haut", chatWelcome: "Shalom ! Demandez-moi un séfer — par exemple, dans quelle boutique il est le moins cher, ou s'il est épuisé quelque part.", chatThinking: "Vérification des boutiques…", chatError: "Le chat n'a pas pu répondre. Réessayez.",
     newReleases: "Nouveautés", shippingTax: "Expédition et taxes", shipNote: "Ce que chaque boutique publie elle-même sur son expédition et ses taxes. Si une boutique ne publie aucun tarif, seule sa caisse donne le vrai montant — cette page ne devine pas.",
     resultsFor: "Résultats pour « {q} »", listingsLoadedOne: "1 annonce chargée", listingsLoadedOther: "{n} annonces chargées",
     alsoSearchedFor: "Aussi recherché : ", searching: "Recherche dans {stores}…",
@@ -222,6 +222,8 @@ function applyLanguage(lang) {
   if (searchBtn) searchBtn.setAttribute("aria-label", t("search"));
   const chatFab = $("#chat-fab");
   if (chatFab) chatFab.setAttribute("aria-label", t("chatTitle"));
+  const toTop = $("#to-top");
+  if (toTop) toTop.setAttribute("aria-label", t("backToTop"));
   document.querySelectorAll("#lang-switcher [data-lang]").forEach((btn) => {
     const active = btn.getAttribute("data-lang") === lang;
     btn.classList.toggle("active", active);
@@ -595,8 +597,23 @@ function renderResults() {
   }
   $("#idle-state").classList.add("d-none");
   const stores = enabledStores();
-  const total = stores.reduce((n, s) => n + (results[s.id]?.products.length || 0), 0);
   const anyLoading = stores.some((s) => !results[s.id] || results[s.id].status === "loading");
+  // Merge every store's listings first, then relevance-filter them
+  // before anything counts or draws: loose store searches (Shopify's
+  // OR matching) otherwise flood the grid with one-word matches.
+  const merged = [];
+  for (const store of stores) {
+    const r = results[store.id];
+    if (r && r.status === "ok") {
+      for (const p of r.products) {
+        merged.push({ store, product: p });
+        productByUrl.set(p.url, { product: p, store });
+      }
+    }
+  }
+  const entries = filterRelevant(
+    merged.map((m) => ({ ...m.product, storeId: m.store.id, store: m.store })), activeQuery);
+  const total = entries.length;
 
   const extraVariants = activeVariants.filter((v) => v !== activeQuery.toLowerCase());
   let html = `
@@ -620,20 +637,9 @@ function renderResults() {
   }
   // Stores with no listings are simply left out — no error or empty
   // notice per store, per the site owner's preference.
-  const merged = [];
-  for (const store of stores) {
-    const r = results[store.id];
-    if (r && r.status === "ok") {
-      for (const p of r.products) {
-        merged.push({ store, product: p });
-        productByUrl.set(p.url, { product: p, store });
-      }
-    }
-  }
   // Group first, then order the groups by the chosen sort using one
   // representative member per group (the member each sort would put
   // first). Inside a group, displayMembers decides the swipe order.
-  const entries = merged.map((m) => ({ ...m.product, storeId: m.store.id, store: m.store }));
   const groups = applyCachedVerdicts(entries, groupProducts(entries));
   const repOf = (g) => {
     if (sortMode === "price-desc") return [...g].sort((a, b) => (b.priceAmount ?? -1) - (a.priceAmount ?? -1))[0];
@@ -1066,9 +1072,13 @@ document.addEventListener("DOMContentLoaded", () => {
     let chatWelcomed = false;
     const addChatBubble = (text, who) => {
       const div = document.createElement("div");
+      // Pure Bootstrap utilities for both bubbles. The panel carries
+      // data-bs-theme="light", so bg-body-tertiary / text-body inside
+      // it always resolve to the light pair — the site's dark scheme
+      // can no longer wash the text out (Zakkai's screenshot).
       div.className = who === "me"
-        ? "align-self-end chat-bubble-me rounded-3 px-3 py-2"
-        : "align-self-start chat-bubble-ai rounded-3 px-3 py-2";
+        ? "align-self-end bg-primary text-white rounded-3 px-3 py-2"
+        : "align-self-start bg-body-tertiary border text-body rounded-3 px-3 py-2";
       div.style.maxWidth = "85%";
       div.style.whiteSpace = "pre-wrap";
       div.textContent = text;
@@ -1108,6 +1118,16 @@ document.addEventListener("DOMContentLoaded", () => {
       if (sendBtn) sendBtn.disabled = false;
       input?.focus();
     });
+  }
+
+  // Back-to-top: a floating button (Bootstrap utilities only) that
+  // appears after scrolling a screenful and smooth-scrolls up.
+  const toTop = $("#to-top");
+  if (toTop) {
+    const toggleToTop = () => toTop.classList.toggle("d-none", window.scrollY < 400);
+    window.addEventListener("scroll", toggleToTop, { passive: true });
+    toggleToTop();
+    toTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
   }
 
   renderStoresButton();
