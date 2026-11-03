@@ -25,7 +25,7 @@
 // Searching stays open without signing in, and there is no checkout
 // and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates } from "./app.js?v=8";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates } from "./app.js?v=9";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
@@ -1067,8 +1067,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const addChatBubble = (text, who) => {
       const div = document.createElement("div");
       div.className = who === "me"
-        ? "align-self-end bg-primary text-white rounded-3 px-3 py-2"
-        : "align-self-start bg-body-tertiary border rounded-3 px-3 py-2";
+        ? "align-self-end chat-bubble-me rounded-3 px-3 py-2"
+        : "align-self-start chat-bubble-ai rounded-3 px-3 py-2";
       div.style.maxWidth = "85%";
       div.style.whiteSpace = "pre-wrap";
       div.textContent = text;

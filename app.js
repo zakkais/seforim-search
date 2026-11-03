@@ -955,6 +955,10 @@ const GROUP_BINDING_CLASS = new Map([
 ]);
 const GROUP_EDITION_MARKERS = new Set([
   "revised", "מבואר", "mevoar", "annotated", "illustrated", "מנוקד", "menukad",
+  // A named translation language is an edition discriminator too: a
+  // Russian Kitzur Shulchan Aruch is not the plain one. ("Hebrew" and
+  // "English" are left out — too many bilingual titles name them.)
+  "russian", "spanish", "french", "german", "portuguese", "italian", "yiddish",
 ]);
 const GROUP_DRESSING = new Set([
   "the", "a", "an", "of", "from", "with", "and", "in", "on", "for", "to", "im", "al", "shel",
@@ -1071,8 +1075,14 @@ function groupProducts(entries) {
       for (const gi of byCore.get(sig.coreKey) ?? []) {
         const g = groups[gi];
         if (g.stores.has(entries[idx].storeId)) continue;
+        // A volume/part label stated on one side only is NOT a rule
+        // match: the unlabelled listing may be a different volume (a
+        // "Living Tehillim" grouped with "Living Tehillim Vol. 4" in
+        // testing). Such pairs still go to the AI check as candidates
+        // — signaturesConflict deliberately does not flag them.
         const fits = g.members.every((mi) =>
-          !signaturesConflict(sigs[mi], sig) && (sig.core.length > 1 || strictSame(sigs[mi], sig)));
+          !signaturesConflict(sigs[mi], sig) && (sigs[mi].part || "") === (sig.part || "") &&
+          (sig.core.length > 1 || strictSame(sigs[mi], sig)));
         if (fits) {
           g.members.push(idx);
           g.stores.add(entries[idx].storeId);
