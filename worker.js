@@ -334,7 +334,8 @@ function parseWooStoreApi(raw) {
     const regRaw = p.prices?.regular_price ? parseInt(p.prices.regular_price, 10) : NaN;
     const priceAmount = Number.isFinite(priceRaw) ? priceRaw / div : null;
     products.push({ title, url, priceText: priceAmount == null ? null : money(priceAmount), priceAmount,
-      compareAtText: Number.isFinite(regRaw) && regRaw !== priceRaw ? money(regRaw / div) : null, imageUrl: p.images?.[0]?.src ?? null });
+      compareAtText: Number.isFinite(regRaw) && regRaw !== priceRaw ? money(regRaw / div) : null, imageUrl: p.images?.[0]?.src ?? null,
+      soldOut: p.is_in_stock === false });
     if (products.length >= MAX_PER_STORE) break;
   }
   return products;
@@ -447,7 +448,7 @@ function mergeAcrossPages(lists) {
   }
   return out;
 }
-async function searchStoreWorker(store, query) {
+async function searchStoreWorker(store, query, env, ctx) {
   const base = { storeId: store.id, storeName: store.name, searchUrl: store.searchUrl(query) };
   // Magento gets one big request instead of paging: its limit parameter
   // is honoured by the Magento stores.
@@ -489,6 +490,18 @@ async function searchStoreWorker(store, query) {
       const res = await fetch(suggestUrl, { headers: { "User-Agent": UA } });
       if (res.ok) products = parseShopifySuggest(await res.text());
     } catch { /* keep empty */ }
+  }
+  if (store.id === "seforimdeals" && env && products.length > 0) {
+    // Annotate sold-out state per product (see getDealsStock). A
+    // handle whose state can't be determined stays unmarked.
+    const handles = [...new Set(products.map((p) => /\/products\/([^/?#]+)/.exec(p.url || "")?.[1]).filter(Boolean))];
+    if (handles.length) {
+      const stock = await getDealsStock(env, ctx, handles);
+      for (const p of products) {
+        const h = /\/products\/([^/?#]+)/.exec(p.url || "")?.[1];
+        if (h && stock[h] !== undefined) p.soldOut = stock[h] === 0;
+      }
+    }
   }
   if (products.length === 0) {
     return { ...base, status: "empty", message: `No listings at ${store.name} matched “${query}”.`, products: [] };
@@ -879,6 +892,265 @@ async function logPrices(env, results) {
 }
 
 // ---------------------------------------------------------------------------
+// SeforimDeals stock map (sold-out badges)
+// ---------------------------------------------------------------------------
+// Zakkai, 2026-11-03: the card must say when an item is sold out at a
+// store. Shopify's search page carries no per-product availability,
+// but each product's public .js JSON does ("available"), so the
+// worker checks just the products a search actually returned and
+// caches each handle's state in KV for ~6 hours. (A whole-catalog
+// crawl was tried first and dropped: the catalog runs past 6,000
+// products, so a full map could never be completed or kept fresh.)
+// A handle whose state can't be determined is left unmarked rather
+// than guessed. eSicha reports stock live in its own API
+// (parseWooStoreApi). Z. Berman's and Hamafitz's search pages expose
+// no stock signal at all, so their cards stay unmarked for now —
+// never a guessed badge.
+// ---------------------------------------------------------------------------
+const STOCK_TTL_MS = 6 * 60 * 60 * 1000;
+const STOCK_MAX_FETCH = 40;
+async function getDealsStock(env, ctx, handles) {
+  const out = {};
+  const stale = [];
+  await Promise.all(handles.map(async (h) => {
+    try {
+      const raw = await env.SEFORIM_KV.get(`stock1:${h}`);
+      if (raw) {
+        const v = JSON.parse(raw);
+        if (Date.now() - (v.ts ?? 0) < STOCK_TTL_MS && (v.s === 0 || v.s === 1)) { out[h] = v.s; return; }
+      }
+    } catch { /* treat as unknown */ }
+    stale.push(h);
+  }));
+  const toFetch = stale.slice(0, STOCK_MAX_FETCH);
+  if (toFetch.length) {
+    const fetched = await Promise.all(toFetch.map(async (h) => {
+      try {
+        const res = await fetch(`https://seforimdeals.com/products/${encodeURIComponent(h)}.js`, { headers: { "User-Agent": UA } });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return typeof data?.available === "boolean" ? (data.available ? 1 : 0) : null;
+      } catch { return null; }
+    }));
+    const puts = [];
+    toFetch.forEach((h, i) => {
+      if (fetched[i] === null) return;
+      out[h] = fetched[i];
+      puts.push(env.SEFORIM_KV.put(`stock1:${h}`, JSON.stringify({ s: fetched[i], ts: Date.now() })).catch(() => {}));
+    });
+    if (puts.length) {
+      if (ctx?.waitUntil) ctx.waitUntil(Promise.all(puts));
+      else await Promise.all(puts);
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Chatbot prototype (Cloudflare Workers AI — no external account)
+// ---------------------------------------------------------------------------
+// POST /chat { question } -> { answer }. The prototype is grounded in
+// the store listings only: the question is turned into a store search,
+// the closest-matching listings are handed to the model as its ONLY
+// facts, and the system prompt forbids inventing anything beyond
+// them. Questions the listings can't answer — history, authorship,
+// what a sefer contains — get an honest "the prototype can't verify
+// that yet". The wider source layers (ChabadLibrary, HebrewBooks, and
+// Sefaria used silently with Frum sources only, per the owner's rule)
+// are a later step, as is a stronger paid model if this free one's
+// Hebrew/Aramaic proves weak. Cost control: Workers AI's free daily
+// allowance is the budget, and KV counters cap the endpoint anyway —
+// 150 questions a day overall, 20 per visitor — so the prototype can
+// never run up a bill.
+
+// Model note: @cf/meta/llama-3.1-8b-instruct was deprecated by
+// Cloudflare (the binding refuses it); the 70B fast model below is
+// current and noticeably better with Hebrew. If it ever starts
+// erroring the same way, check the Workers AI model catalog.
+const CHAT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const CHAT_DAILY_CAP = 150;
+const CHAT_IP_DAILY_CAP = 20;
+
+const CHAT_STOPWORDS = new Set(("what who whom when where why how is are was were the a an of in on for to and or " +
+  "does do did can could should would i you he she it they we me my your his her their our this that these those " +
+  "sefer seforim book books set sets volume volumes vol edition editions price cost much many available stock " +
+  "store stores sell sells author wrote written published year date history historical technical details detail " +
+  "about tell please find show compare difference different between vs versus").split(" "));
+
+function chatSearchTerms(question) {
+  const toks = String(question || "").split(/[^A-Za-z\u0590-\u05FF0-9-]+/).filter(Boolean);
+  const kept = toks.filter((tk) => /[\u0590-\u05FF]/.test(tk) || !CHAT_STOPWORDS.has(tk.toLowerCase()));
+  return kept.slice(0, 6).join(" ");
+}
+
+async function chatCount(env, key) {
+  try {
+    const n = parseInt((await env.SEFORIM_KV.get(key)) || "0", 10);
+    return Number.isFinite(n) ? n : 0;
+  } catch { return 0; }
+}
+
+// ---------------------------------------------------------------------------
+// Match check for grouped cards (Workers AI)
+// ---------------------------------------------------------------------------
+// POST /match { pairs: [{a:{title,store,price}, b:{...}}] } ->
+// { verdicts: [{ i, same }] }, where i is the pair's index in the
+// request. The site's rule-based grouper (app.js) settles the clear
+// cases itself; pairs it cannot settle — same core title, but a
+// detail missing on one side — are sent here, and the model judges
+// whether the two listings are the same sefer in the same edition
+// and format. Hard conflicts (different stated volume counts or size
+// classes) never reach this endpoint, and the client never lets a
+// verdict override them. The client caches verdicts per title pair.
+// A daily cap protects the free AI allowance; over the cap the
+// endpoint returns no verdicts and the rules simply stand.
+// ---------------------------------------------------------------------------
+const MATCH_DAILY_CAP = 400;
+const MATCH_MAX_PAIRS = 16;
+async function handleMatch(request, env, ctx) {
+  const noStore = { "Cache-Control": "no-store" };
+  if (request.method !== "POST") return jsonResponse({ error: "POST only" }, 405, request, noStore);
+  if (!env.AI) return jsonResponse({ verdicts: [] }, 200, request, noStore);
+  let pairs = [];
+  try {
+    const body = await request.json();
+    if (Array.isArray(body?.pairs)) {
+      pairs = body.pairs.slice(0, MATCH_MAX_PAIRS)
+        .map((pr, i) => ({ a: pr?.a, b: pr?.b, i }))
+        .filter((pr) => pr.a?.title && pr.b?.title);
+    }
+  } catch { /* no usable pairs */ }
+  if (!pairs.length) return jsonResponse({ verdicts: [] }, 200, request, noStore);
+  if (env.SEFORIM_KV) {
+    const day = new Date().toISOString().slice(0, 10);
+    const key = `match:day:${day}`;
+    let used = 0;
+    try { used = parseInt(await env.SEFORIM_KV.get(key), 10) || 0; } catch { /* ignore */ }
+    if (used + pairs.length > MATCH_DAILY_CAP) return jsonResponse({ verdicts: [] }, 200, request, noStore);
+    if (ctx?.waitUntil) ctx.waitUntil(env.SEFORIM_KV.put(key, String(used + pairs.length), { expirationTtl: 2 * 24 * 3600 }).catch(() => {}));
+  }
+  const listing = (x) => `"${String(x.title).slice(0, 160)}" (${x.store || "store"}${x.price ? `, ${x.price}` : ""})`;
+  const userMsg = pairs.map((pr, k) => `${k + 1}. A: ${listing(pr.a)}\n   B: ${listing(pr.b)}`).join("\n");
+  const system = [
+    "You compare pairs of Jewish bookstore listings and decide whether the two listings in each pair are the SAME sefer in the SAME edition and format:",
+    "same work, same publisher/edition, same number of volumes, same size, same binding.",
+    "A title may be in Hebrew in one listing and transliterated English in the other — that alone does not make them different books.",
+    "Store dressing differs (words like 'set', 'vol.', publisher names added or dropped); look past it.",
+    "If any stated detail conflicts — different volume counts, different sizes, different bindings — or you cannot tell, answer false for that pair.",
+    "Reply with ONLY a JSON array of true/false values, one per pair, in order. No other text.",
+  ].join(" ");
+  try {
+    const out = await env.AI.run(CHAT_MODEL, {
+      messages: [{ role: "system", content: system }, { role: "user", content: userMsg }],
+      max_tokens: 120,
+    });
+    const text = String(out?.response ?? out?.choices?.[0]?.message?.content ?? out?.result?.response ?? out?.result?.choices?.[0]?.message?.content ?? "");
+    // The model is told to answer with a bare JSON array, but it may
+    // capitalize True/False or wrap the array in prose. Parse strictly
+    // first, then fall back to scanning for true/false tokens when
+    // their count matches the number of pairs exactly.
+    let arr = null;
+    const m = /\[[\s\S]*\]/.exec(text);
+    if (m) {
+      try {
+        const parsed = JSON.parse(m[0].replace(/\bTrue\b/g, "true").replace(/\bFalse\b/g, "false"));
+        if (Array.isArray(parsed)) arr = parsed;
+      } catch { /* fall through to the token scan */ }
+    }
+    if (!arr) {
+      const tokens = (text.match(/true|false/gi) || []).map((t) => t.toLowerCase() === "true");
+      if (tokens.length === pairs.length) arr = tokens;
+    }
+    if (!arr) return jsonResponse({ verdicts: [] }, 200, request, noStore);
+    const verdicts = [];
+    pairs.forEach((pr, k) => { if (typeof arr[k] === "boolean") verdicts.push({ i: pr.i, same: arr[k] }); });
+    return jsonResponse({ verdicts }, 200, request, noStore);
+  } catch {
+    return jsonResponse({ verdicts: [] }, 200, request, noStore);
+  }
+}
+
+async function handleChat(request, env, ctx) {
+  const noStore = { "Cache-Control": "no-store" };
+  if (request.method !== "POST") return jsonResponse({ error: "POST only" }, 405, request, noStore);
+  if (!env.AI) return jsonResponse({ error: "The chat prototype is not switched on yet." }, 503, request, noStore);
+  let body;
+  try { body = await request.json(); } catch { return jsonResponse({ error: "Bad request" }, 400, request, noStore); }
+  const question = String(body?.question || "").trim().slice(0, 500);
+  if (!question) return jsonResponse({ error: "Ask a question first." }, 400, request, noStore);
+
+  // Daily caps, counted in KV by UTC day.
+  const day = new Date().toISOString().slice(0, 10);
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  let ipHash = 0;
+  for (const ch of ip) ipHash = (ipHash * 31 + ch.charCodeAt(0)) >>> 0;
+  const ipKey = `chat:ip:${day}:${ipHash.toString(16)}`;
+  if (env.SEFORIM_KV) {
+    const total = await chatCount(env, `chat:day:${day}`);
+    const mine = await chatCount(env, ipKey);
+    if (total >= CHAT_DAILY_CAP || mine >= CHAT_IP_DAILY_CAP) {
+      return jsonResponse({ answer: "The chat prototype has reached its daily limit — please try again tomorrow. Searching the site works as usual." }, 200, request, noStore);
+    }
+    await env.SEFORIM_KV.put(`chat:day:${day}`, String(total + 1), { expirationTtl: 172800 });
+    await env.SEFORIM_KV.put(ipKey, String(mine + 1), { expirationTtl: 172800 });
+  }
+
+  // Grounding: search the stores with the question's key terms and
+  // keep the closest-matching listings as the model's only facts.
+  // (These searches also feed the passive price log, like any other.)
+  let contextLines = [];
+  const terms = chatSearchTerms(question);
+  if (terms) {
+    try {
+      const results = await Promise.all(STORES.map((s) => searchStoreWorker(s, terms, env, ctx)));
+      if (ctx?.waitUntil) ctx.waitUntil(logPrices(env, results));
+      const words = terms.toLowerCase().split(/\s+/);
+      const scored = [];
+      for (const r of results) {
+        if (r.status !== "ok") continue;
+        for (const p of r.products) {
+          const lt = p.title.toLowerCase();
+          const score = words.reduce((n, w) => n + (lt.includes(w) ? 1 : 0), 0);
+          scored.push({ p, storeName: r.storeName, score });
+        }
+      }
+      scored.sort((a, b) => b.score - a.score || ((a.p.priceAmount ?? 1e9) - (b.p.priceAmount ?? 1e9)));
+      contextLines = scored.slice(0, 8).map(({ p, storeName }) =>
+        `- ${p.title} — ${storeName}: ${p.priceText || "price shown at the store"}${p.compareAtText ? ` (list price ${p.compareAtText})` : ""}${p.soldOut ? " — SOLD OUT at this store" : ""} — ${p.url}`);
+    } catch { /* no context; the prompt below handles that case */ }
+  }
+
+  const system = [
+    "You are the chat assistant for Seforim Search, a site that searches Jewish bookstores (seforim stores). This is a prototype.",
+    "Answer ONLY from the listing facts provided below. Never invent a price, a volume count, an author, a date, or any other fact.",
+    "If the listings do not answer the question, say plainly that this prototype can only answer from current store listings and cannot verify that yet.",
+    "When you use a listing, name its store. Keep answers short: two to four sentences. Answer in the language the question was asked in.",
+    "Prices are the stores' current listing prices and can change; say so when an answer turns on a price.",
+  ].join(" ");
+  const userMsg = `Question: ${question}\n\nListings found${terms ? ` for "${terms}"` : ""}:\n${contextLines.length ? contextLines.join("\n") : "(none)"}`;
+  try {
+    const out = await env.AI.run(CHAT_MODEL, {
+      messages: [{ role: "system", content: system }, { role: "user", content: userMsg }],
+      max_tokens: 400,
+    });
+    // Workers AI answers in one of two shapes depending on the model:
+    // the classic { response } or an OpenAI-style chat completion
+    // ({ choices: [{ message: { content } }] }). Read both.
+    const answer = String(
+      out?.response ||
+      out?.choices?.[0]?.message?.content ||
+      out?.result?.response ||
+      out?.result?.choices?.[0]?.message?.content ||
+      ""
+    ).trim();
+    if (!answer) throw new Error("empty answer");
+    return jsonResponse({ answer }, 200, request, noStore);
+  } catch {
+    return jsonResponse({ error: "The chat prototype could not answer just now — please try again." }, 502, request, noStore);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Entry point. /auth/* and /api/* are sign-in and wishlist routes (see
 // handleAuth); /stores lists the stores; anything else with ?q= runs a
 // search across the included stores (or one store with &store=<id>).
@@ -891,6 +1163,12 @@ export default {
     }
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(request) });
+    }
+    if (url.pathname === "/chat") {
+      return handleChat(request, env, ctx);
+    }
+    if (url.pathname === "/match") {
+      return handleMatch(request, env, ctx);
     }
     if (url.pathname === "/stores") {
       return jsonResponse({ stores: STORES.map((s) => ({ id: s.id, name: s.name, note: s.note ?? null })) }, 200, request);
@@ -916,7 +1194,7 @@ export default {
       const hit = await cache.match(cacheKey);
       if (hit) return hit;
     }
-    const results = await Promise.all(stores.map((s) => searchStoreWorker(s, q)));
+    const results = await Promise.all(stores.map((s) => searchStoreWorker(s, q, env, ctx)));
     if (ctx?.waitUntil) ctx.waitUntil(logPrices(env, results));
     const response = jsonResponse({ query: q, results });
     if (cache && ctx?.waitUntil) {

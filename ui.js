@@ -25,11 +25,12 @@
 // Searching stays open without signing in, and there is no checkout
 // and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts } from "./app.js?v=7";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates } from "./app.js?v=8";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
 const LS_WISHLIST = "ssp:wishlist";
+const LS_MATCHCACHE = "ssp:matchcache";
 const LS_LANG = "ssp:lang";
 // Languages for the footer switcher (index.html). English is the
 // default and stays available so visitors can always switch back.
@@ -61,7 +62,7 @@ const I18N = {
     idleText: "Type a title above — in English or Hebrew — and this page gathers the matching listings, each with its own cover and price.",
     footerNote: "Listings, covers, and prices come live from each store's own website at search time. Searching needs no account; signing in with Google is optional and only syncs your wishlist. Your store choices and your local wishlist are kept in your own browser.",
     storesIncluded: "Stores · {n} of {total} included",
-    save: "♡", saved: "♥", remove: "Remove", onSale: "On sale", priceAtStore: "Price at store",
+    save: "♡", saved: "♥", remove: "Remove", onSale: "On sale", soldOut: "Sold out", inStores: "In {n} stores", priceAtStore: "Price at store",
     scan: "Scan ISBN", scanTitle: "Scan an ISBN or QR code", scanHint: "Point the camera at the barcode on the back of the sefer.", scanUnsupported: "Scanning is not supported in this browser — type the ISBN into the search box instead.", cancel: "Cancel",
     newReleases: "New & just in", shippingTax: "Shipping & tax", shipNote: "What each store itself publishes about its shipping and tax. Where a store publishes no rate, only its own checkout has the real number — this page doesn't guess.",
     resultsFor: "Results for “{q}”", listingsLoadedOne: "1 listing loaded", listingsLoadedOther: "{n} listings loaded",
@@ -87,7 +88,7 @@ const I18N = {
     idleText: "הקלד כותרת למעלה — בעברית או באנגלית — והדף יאסוף את המודעות המתאימות, כל אחת עם הכריכה והמחיר שלה.",
     footerNote: "המודעות, הכריכות והמחירים מגיעים בשידור חי מאתר כל חנות בעת החיפוש. החיפוש אינו דורש חשבון; כניסה עם גוגל היא אופציונלית ורק מסנכרנת את רשימת הספרים השמורים. בחירת החנויות ורשימת הספרים המקומית נשמרות בדפדפן שלך.",
     storesIncluded: "חנויות · {n} מתוך {total} כלולות",
-    save: "♡", saved: "♥", remove: "הסר", onSale: "במבצע", priceAtStore: "מחיר בחנות",
+    save: "♡", saved: "♥", remove: "הסר", onSale: "במבצע", soldOut: "אזל מהמלאי", inStores: "ב-{n} חנויות", priceAtStore: "מחיר בחנות",
     scan: "סריקת ISBN", scanTitle: "סריקת ISBN או קוד QR", scanHint: "כוונו את המצלמה אל הברקוד שבגב הספר.", scanUnsupported: "הסריקה אינה נתמכת בדפדפן זה — הקלידו את ה-ISBN בתיבת החיפוש.", cancel: "ביטול",
     newReleases: "חדש והגיע", shippingTax: "משלוח ומס", shipNote: "מה שכל חנות מפרסמת בעצמה על המשלוח והמס שלה. חנות שלא מפרסמת מחיר — רק בקופה שלה יש את המספר האמיתי; העמוד הזה לא מנחש.",
     resultsFor: "תוצאות עבור “{q}”", listingsLoadedOne: "מודעה אחת נטענה", listingsLoadedOther: "{n} מודעות נטענו",
@@ -113,7 +114,7 @@ const I18N = {
     idleText: "שרײַבט אַ טיטל אויבן — אויף ענגליש אָדער העברעיִש — און דער בלאַט וועט צונויפֿזאַמלען די פּאַסיקע ליסטינגס, יעדע מיט איר דעקל און פּרײַז.",
     footerNote: "ליסטינגס, דעקלעך און פּרײַזן קומען לעבעדיק פֿון יעדער קראָם׳ס אייגענער וועבזײַט בעת דעם זוכן. זוכן דאַרף קיין חשבון; אײַנצייכענען מיט גוגל איז פֿרײַוויליק און סינקראָניזירט נאָר אײַער ווישליסט. אײַערע קראָם־קלייַבן און לאָקאַלע ווישליסט ווערן געהאַלטן אין אײַער בלעטערער.",
     storesIncluded: "קראָמען · {n} פֿון {total} אַרײַנגענומען",
-    save: "♡", saved: "♥", remove: "אַראָפּנעמען", onSale: "אויף סעיל", priceAtStore: "פּרײַז אין קראָם",
+    save: "♡", saved: "♥", remove: "אַראָפּנעמען", onSale: "אויף סעיל", soldOut: "אויספאַרקויפט", inStores: "אין {n} קראָמען", priceAtStore: "פּרײַז אין קראָם",
     scan: "סקענען ISBN", scanTitle: "סקענען אַן ISBN אָדער QR קאָד", scanHint: "ווײַזט די קאַמעראַ אויפֿן באַרקאָד אויפֿן רוקן פֿונעם ספֿר.", scanUnsupported: "סקענען ווערט נישט געשטיצט אין דעם בלעטערער — טיפּט דעם ISBN אין דער זוך־קעסטל.", cancel: "אָפּזאָגן",
     newReleases: "נײַ און פֿריש אָנגעקומען", shippingTax: "שיפּינג און שטײַער", shipNote: "וואָס יעדער קראָם גיט אַליין אָן וועגן זײַן שיפּינג און שטײַער. אַ קראָם וואָס גיט נישט אָן קיין פּרײַז — נאָר בײַם קאַסע איז דאָ דער עכטער נומער; דער בלאַט טרעפֿט נישט.",
     resultsFor: "רעזולטאַטן פֿאַר “{q}”", listingsLoadedOne: "1 ליסטינג געלאַדן", listingsLoadedOther: "{n} ליסטינגס געלאַדן",
@@ -139,7 +140,7 @@ const I18N = {
     idleText: "Escribe un título arriba — en inglés o en hebreo — y esta página reunirá los anuncios correspondientes, cada uno con su portada y precio.",
     footerNote: "Los anuncios, portadas y precios llegan en vivo desde el sitio web de cada tienda al buscar. Buscar no necesita cuenta; iniciar sesión con Google es opcional y solo sincroniza tu lista de deseos. Tus tiendas elegidas y tu lista local se guardan en tu navegador.",
     storesIncluded: "Tiendas · {n} de {total} incluidas",
-    save: "♡", saved: "♥", remove: "Quitar", onSale: "En oferta", priceAtStore: "Precio en tienda",
+    save: "♡", saved: "♥", remove: "Quitar", onSale: "En oferta", soldOut: "Agotado", inStores: "En {n} tiendas", priceAtStore: "Precio en tienda",
     scan: "Escanear ISBN", scanTitle: "Escanea un ISBN o código QR", scanHint: "Apunta la cámara al código de barras en la parte trasera del libro.", scanUnsupported: "El escaneo no es compatible con este navegador: escribe el ISBN en el cuadro de búsqueda.", cancel: "Cancelar",
     newReleases: "Novedades", shippingTax: "Envío e impuestos", shipNote: "Lo que cada tienda publica sobre sus envíos e impuestos. Si una tienda no publica tarifas, solo su caja tiene el número real: esta página no lo inventa.",
     resultsFor: "Resultados para “{q}”", listingsLoadedOne: "1 anuncio cargado", listingsLoadedOther: "{n} anuncios cargados",
@@ -165,7 +166,7 @@ const I18N = {
     idleText: "Tapez un titre ci-dessus — en anglais ou en hébreu — et cette page rassemblera les annonces correspondantes, chacune avec sa couverture et son prix.",
     footerNote: "Les annonces, couvertures et prix proviennent en direct du site de chaque boutique au moment de la recherche. La recherche ne nécessite aucun compte ; se connecter avec Google est facultatif et ne fait que synchroniser votre liste de souhaits. Vos boutiques choisies et votre liste locale sont conservées dans votre navigateur.",
     storesIncluded: "Boutiques · {n} sur {total} incluses",
-    save: "♡", saved: "♥", remove: "Retirer", onSale: "En solde", priceAtStore: "Prix en boutique",
+    save: "♡", saved: "♥", remove: "Retirer", onSale: "En solde", soldOut: "Épuisé", inStores: "Dans {n} boutiques", priceAtStore: "Prix en boutique",
     scan: "Scanner l'ISBN", scanTitle: "Scanner un ISBN ou un code QR", scanHint: "Pointez l'appareil photo vers le code-barres au dos du livre.", scanUnsupported: "La numérisation n'est pas prise en charge dans ce navigateur — saisissez l'ISBN dans la zone de recherche.", cancel: "Annuler",
     newReleases: "Nouveautés", shippingTax: "Expédition et taxes", shipNote: "Ce que chaque boutique publie elle-même sur son expédition et ses taxes. Si une boutique ne publie aucun tarif, seule sa caisse donne le vrai montant — cette page ne devine pas.",
     resultsFor: "Résultats pour « {q} »", listingsLoadedOne: "1 annonce chargée", listingsLoadedOther: "{n} annonces chargées",
@@ -437,7 +438,7 @@ function renderStoresButton() {
 const BOOK_SVG = `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 4.5v15Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>`;
 const FALLBACK_IMG = `<div class="product-img d-flex align-items-center justify-content-center text-secondary">${BOOK_SVG}</div>`;
 
-function productCard(store, p, wishMode) {
+function cardInner(store, p, wishMode) {
   const price = p.priceText
     ? `<span class="fw-bold price">${esc(p.priceText)}</span>` +
       (p.compareAtText
@@ -450,13 +451,11 @@ function productCard(store, p, wishMode) {
     : `<button type="button" class="btn btn-sm fs-5 lh-1 ${saved ? "btn-secondary" : "btn-outline-secondary"} position-relative z-2" data-wish-url="${esc(p.url)}" aria-label="${saved ? "Saved to wishlist" : "Save to wishlist"}"${saved ? ` aria-pressed="true"` : ""}>${saved ? t("saved") : t("save")}</button>`;
   const img = p.imageUrl
     ? `<img src="${esc(p.imageUrl)}" alt="${esc(p.title)}" loading="lazy"
-            class="w-100 object-fit-contain product-img" onerror="this.outerHTML=window.__sspFallbackImg">`
+            class="w-100 object-fit-contain product-img${p.soldOut ? " opacity-75" : ""}" onerror="this.outerHTML=window.__sspFallbackImg">`
     : FALLBACK_IMG;
   return `
-    <div class="col">
-      <div class="card h-100 shadow-sm position-relative">
         <div class="p-2 pb-0">
-          <div class="rounded product-img-wrap position-relative">${img}${p.compareAtText ? `<span class="badge rounded-pill text-bg-danger position-absolute top-0 start-0 m-2 z-2 shadow-sm text-uppercase">${t("onSale")}</span>` : ""}</div>
+          <div class="rounded product-img-wrap position-relative">${img}${p.compareAtText ? `<span class="badge rounded-pill text-bg-danger position-absolute top-0 start-0 m-2 z-2 shadow-sm text-uppercase">${t("onSale")}</span>` : ""}${p.soldOut ? `<span class="badge rounded-pill text-bg-secondary position-absolute top-0 end-0 m-2 z-2 shadow-sm text-uppercase">${t("soldOut")}</span>` : ""}</div>
         </div>
         <div class="card-body d-flex flex-column pt-2">
           <p class="store-badge d-flex align-items-center gap-1 mb-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><path d="M9 21V13h6v8"/></svg>${esc(store.name)}</p>
@@ -464,6 +463,115 @@ function productCard(store, p, wishMode) {
              class="stretched-link font-display fw-medium text-decoration-none product-title"
              aria-label="View ${esc(p.title)} at ${esc(store.name)}">${esc(p.title)}</a>
           <div class="mt-auto pt-2 d-flex justify-content-between align-items-center gap-2"><p class="mb-0">${price}</p>${wishBtn}</div>
+        </div>`;
+}
+
+function productCard(store, p, wishMode) {
+  return `
+    <div class="col">
+      <div class="card h-100 shadow-sm position-relative">${cardInner(store, p, wishMode)}
+      </div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Grouped cards + the AI match check
+// ---------------------------------------------------------------------------
+// groupProducts (app.js) settles the clear cases by rule. Pairs it
+// leaves apart but suspects — same sefer, details stated on one side
+// only — are judged by the worker's /match endpoint, and each verdict
+// is cached in this browser per title pair, so a pair is only ever
+// asked about once. A "same" verdict merges the two groups on the
+// next render; a "different" verdict just leaves the cards separate.
+// ---------------------------------------------------------------------------
+let groupSeq = 0;
+let matchCache = {};
+try { matchCache = JSON.parse(localStorage.getItem(LS_MATCHCACHE) || "{}") || {}; } catch { matchCache = {}; }
+const pairKeyOf = (a, b) => [a.title, b.title].map((s) => String(s || "").trim().toLowerCase()).sort().join(" || ");
+function saveMatchCache() {
+  try { localStorage.setItem(LS_MATCHCACHE, JSON.stringify(matchCache)); } catch { /* private mode etc. */ }
+}
+
+function applyCachedVerdicts(entries, groups) {
+  for (const c of matchCandidates(entries, groups)) {
+    if (matchCache[pairKeyOf(c.a, c.b)] !== true) continue;
+    const gi = groups.findIndex((g) => g.includes(c.a));
+    const gj = groups.findIndex((g) => g.includes(c.b));
+    if (gi < 0 || gj < 0 || gi === gj) continue;
+    if (groups[gj].some((e) => groups[gi].some((x) => x.storeId === e.storeId))) continue;
+    let ok = true;
+    for (const x of groups[gi]) {
+      for (const y of groups[gj]) {
+        if (signaturesConflict(productSignature(x.title), productSignature(y.title))) { ok = false; break; }
+      }
+      if (!ok) break;
+    }
+    if (!ok) continue;
+    groups[gi] = [...groups[gi], ...groups[gj]];
+    groups.splice(gj, 1);
+  }
+  return groups;
+}
+
+let aiCheckInFlight = false;
+function scheduleAiMatchCheck(entries, groups) {
+  if (!WORKER_URL || aiCheckInFlight) return;
+  const pending = matchCandidates(entries, groups)
+    .filter((c) => !(pairKeyOf(c.a, c.b) in matchCache))
+    .slice(0, 16);
+  if (!pending.length) return;
+  aiCheckInFlight = true;
+  fetch(`${WORKER_URL}/match`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      pairs: pending.map((c) => ({
+        a: { title: c.a.title, store: c.a.store?.name || c.a.storeId, price: c.a.priceText || "" },
+        b: { title: c.b.title, store: c.b.store?.name || c.b.storeId, price: c.b.priceText || "" },
+      })),
+    }),
+  })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      aiCheckInFlight = false;
+      if (!data || !Array.isArray(data.verdicts)) return;
+      let changed = false;
+      for (const v of data.verdicts) {
+        const c = pending[v.i];
+        if (!c) continue;
+        matchCache[pairKeyOf(c.a, c.b)] = v.same === true;
+        if (v.same === true) changed = true;
+      }
+      saveMatchCache();
+      if (changed) renderResults();
+    })
+    .catch(() => { aiCheckInFlight = false; });
+}
+
+// Members display cheapest-available first, so the front of the card
+// is the best buy; sold-out listings sit at the back of the swipe.
+const displayMembers = (g) => [...g].sort((a, b) =>
+  ((a.soldOut === true) - (b.soldOut === true)) || ((a.priceAmount ?? 1e12) - (b.priceAmount ?? 1e12)));
+
+function groupCard(members) {
+  if (members.length === 1) return productCard(members[0].store, members[0]);
+  const id = `grp-${++groupSeq}`;
+  const slides = members.map((m, i) => `
+        <div class="carousel-item${i === 0 ? " active" : ""}">${cardInner(m.store, m)}
+        </div>`).join("");
+  return `
+    <div class="col">
+      <div class="card h-100 shadow-sm position-relative">
+        <div class="px-2 pt-2 d-flex align-items-center justify-content-between position-relative z-2">
+          <span class="badge rounded-pill text-bg-primary">${t("inStores", { n: members.length })}</span>
+          <span class="btn-group btn-group-sm" role="group" aria-label="Stores">
+            <button type="button" class="btn btn-outline-secondary py-0 px-2" data-bs-target="#${id}" data-bs-slide="prev" aria-label="Previous store">&#8249;</button>
+            <button type="button" class="btn btn-outline-secondary py-0 px-2" data-bs-target="#${id}" data-bs-slide="next" aria-label="Next store">&#8250;</button>
+          </span>
+        </div>
+        <div id="${id}" class="carousel slide" data-bs-interval="false" data-bs-touch="true">
+          <div class="carousel-inner">${slides}
+          </div>
         </div>
       </div>
     </div>`;
@@ -492,9 +600,9 @@ function renderResults() {
     ${extraVariants.length ? `<p class="text-secondary small mb-0">${t("alsoSearchedFor")}${extraVariants.map((v) => `“${esc(v)}”`).join(", ")}</p>` : ""}
     ${WORKER_URL ? "" : `<p class="text-secondary small mb-0">Fetching back-end not yet configured — results load directly from each store where the browser allows it. See README for the worker setup.</p>`}`;
 
-  // One merged grid: products from every store are sorted together
-  // (by price or alphabetically), each card still carrying its store
-  // badge. Stores are never shown as separate sections.
+  // One merged grid: listings from every store together, never in
+  // per-store sections. Listings of the same sefer at several stores
+  // are grouped into a single card (see groupCard below).
   const loadingStores = stores.filter((s) => !results[s.id] || results[s.id].status === "loading");
   if (loadingStores.length) {
     html += `
@@ -515,13 +623,25 @@ function renderResults() {
       }
     }
   }
-  const sorted = sortProducts(merged.map((m) => m.product), sortMode, activeQuery);
-  // sortProducts returns products, not pairs: re-pair by product identity
-  // via a Map so each card keeps its store badge after a global sort.
-  const byProduct = new Map(merged.map((m) => [m.product, m.store]));
-  if (sorted.length) {
+  // Group first, then order the groups by the chosen sort using one
+  // representative member per group (the member each sort would put
+  // first). Inside a group, displayMembers decides the swipe order.
+  const entries = merged.map((m) => ({ ...m.product, storeId: m.store.id, store: m.store }));
+  const groups = applyCachedVerdicts(entries, groupProducts(entries));
+  const repOf = (g) => {
+    if (sortMode === "price-desc") return [...g].sort((a, b) => (b.priceAmount ?? -1) - (a.priceAmount ?? -1))[0];
+    if (sortMode === "alpha-asc" || sortMode === "alpha-desc")
+      return [...g].sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")))[0];
+    return displayMembers(g)[0];
+  };
+  const groupOfRep = new Map();
+  const reps = groups.map((g) => { const r = repOf(g); groupOfRep.set(r, g); return r; });
+  const sortedReps = sortProducts(reps, sortMode, activeQuery);
+  if (entries.length) {
+    groupSeq = 0;
     html += `<div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mt-1">` +
-      sorted.map((p) => productCard(byProduct.get(p), p)).join("") + `</div>`;
+      sortedReps.map((r) => groupCard(displayMembers(groupOfRep.get(r)))).join("") + `</div>`;
+    if (!anyLoading) scheduleAiMatchCheck(entries, groups);
   } else if (!anyLoading) {
     html += `<div class="alert alert-light border text-secondary mt-3" role="note">${t("noListings", { q: esc(activeQuery) })}</div>`;
   }

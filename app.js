@@ -234,6 +234,24 @@ const HEBREW_BRIDGE = [
   ["divrei", ["דברי"]],
   ["hayamim", ["הימים"]],
   ["chayei", ["חיי"], "hayei"],
+  ["asher", ["אשר"]],
+  ["yosef", ["יוסף"]],
+  ["moshe", ["משה"]],
+  ["yaakov", ["יעקב"]],
+  ["yitzchak", ["יצחק"]],
+  ["chaim", ["חיים"]],
+  ["menachem", ["מנחם"]],
+  ["shlomo", ["שלמה"]],
+  ["yehuda", ["יהודה"]],
+  ["levi", ["לוי"]],
+  ["yisrael", ["ישראל"]],
+  ["eliezer", ["אליעזר"]],
+  ["meir", ["מאיר"]],
+  ["pinchas", ["פנחס"]],
+  ["eliyahu", ["אליהו"]],
+  ["ben", ["בן"]],
+  ["shneur", ["שניאור"]],
+  ["zalman", ["זלמן"]],
 ];
 const CANON_WORD = new Map();
 const HEBREW_FORM = new Map();
@@ -681,7 +699,8 @@ function parseWooStoreApi(raw) {
       priceText: priceAmount == null ? null : money(priceAmount),
       priceAmount,
       compareAtText: Number.isFinite(regRaw) && regRaw !== priceRaw ? money(regRaw / div) : null,
-      imageUrl: p.images?.[0]?.src ?? null
+      imageUrl: p.images?.[0]?.src ?? null,
+      soldOut: p.is_in_stock === false
     });
     if (products.length >= MAX_PER_STORE)
       break;
@@ -903,6 +922,205 @@ function sortProducts(products, mode, query) {
     return (a.priceAmount - b.priceAmount) * dir;
   });
 }
+// ---------------------------------------------------------------------------
+// Grouping: the same sefer listed by several stores becomes ONE card
+// (Zakkai's design, 2026-11-03: the card says how many stores carry it,
+// cheapest price up front, swipe inside the card to flip stores).
+//
+// A listing's signature is its core name — canonical words (Hebrew
+// bridge applied) with store dressing removed — plus the
+// discriminators that make two listings DIFFERENT items: the set's
+// volume count, a series part label, the size class, the binding, and
+// edition markers. Rules group only listings whose cores are identical
+// and whose discriminators never conflict, at most one listing per
+// store per group. Anything softer — a detail stated on one side only
+// is fine for the rules, but cores that merely overlap, or a
+// Hebrew-titled listing against a dressed-up transliteration — is NOT
+// guessed by the rules: matchCandidates proposes those pairs and the
+// worker's /match endpoint lets the AI judge them (the client's
+// verdict cache makes each pair a one-time question). A wrong merge
+// would promise one store's price for another store's edition, so
+// every doubtful case resolves to "separate cards", which is simply
+// how the site behaved before grouping existed.
+// ---------------------------------------------------------------------------
+const GROUP_SIZE_CLASS = new Map([
+  ["full", "FULL"], ["large", "FULL"], ["big", "FULL"], ["גדול", "FULL"],
+  ["mid", "MID"], ["medium", "MID"],
+  ["compact", "SMALL"], ["small", "SMALL"], ["mini", "SMALL"], ["pocket", "SMALL"], ["student", "SMALL"], ["קטן", "SMALL"],
+]);
+const GROUP_BINDING_CLASS = new Map([
+  ["leather", "LEATHER"],
+  ["hardcover", "HARD"], ["hard", "HARD"], ["hc", "HARD"],
+  ["paperback", "SOFT"], ["softcover", "SOFT"], ["pb", "SOFT"],
+]);
+const GROUP_EDITION_MARKERS = new Set([
+  "revised", "מבואר", "mevoar", "annotated", "illustrated", "מנוקד", "menukad",
+]);
+const GROUP_DRESSING = new Set([
+  "the", "a", "an", "of", "from", "with", "and", "in", "on", "for", "to", "im", "al", "shel",
+  "על", "עם", "את", "של",
+  "sefer", "book", "books", "set", "sets", "vol", "vols", "volume", "volumes",
+  "כרכים", "סט", "חלק", "חלקים", "chelek", "helek",
+  "edition", "editions", "new", "standard", "size", "sized",
+  "full", "large", "big", "mid", "medium", "compact", "small", "mini", "pocket", "student",
+  "גדול", "קטן",
+  "leather", "hardcover", "paperback", "softcover", "hard", "hc", "pb",
+  "h", "c", "p", "b",
+]);
+const GROUP_HEBREW_NUMERAL = {
+  "א": 1, "ב": 2, "ג": 3, "ד": 4, "ה": 5, "ו": 6, "ז": 7, "ח": 8, "ט": 9,
+  "י": 10, "יא": 11, "יב": 12, "יג": 13, "יד": 14, "טו": 15, "טז": 16,
+  "יז": 17, "יח": 18, "יט": 19, "כ": 20,
+};
+const GROUP_NUM_WORDS = new Set(["vol", "vols", "volume", "volumes", "כרכים"]);
+const GROUP_PART_WORDS = new Set(["vol", "vols", "volume", "volumes", "חלק", "חלקים", "chelek", "helek", "part", "parts"]);
+// Transliterated Hebrew numerals, for titles like "Chelek Alef" or
+// "Chelek Yud Beis": labels only need to be consistent, not summed.
+const GROUP_LATIN_NUMERAL = {
+  alef: 1, aleph: 1, beis: 2, bet: 2, bais: 2, gimel: 3, gimmel: 3,
+  dalet: 4, daled: 4, hei: 5, he: 5, vov: 6, vav: 6, zayin: 7,
+  ches: 8, chet: 8, tes: 9, tet: 9, yud: 10, yod: 10, chaf: 20, kuf: 100,
+};
+
+function productSignature(title) {
+  const folded = String(title || "").replace(/שו["'׳״]ת/g, " shut ");
+  const words = canonWords(normWords(folded));
+  let count = null;
+  let sizeClass = null;
+  let binding = null;
+  let isSet = false;
+  const editions = new Set();
+  const partTokens = [];
+  const coreSet = new Set();
+  const asNum = (w) => (/^\d+$/.test(w) ? parseInt(w, 10) : GROUP_HEBREW_NUMERAL[w] ?? GROUP_LATIN_NUMERAL[w]);
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const next = words[i + 1];
+    if (sizeClass === null && GROUP_SIZE_CLASS.has(w)) sizeClass = GROUP_SIZE_CLASS.get(w);
+    if (binding === null) {
+      if (GROUP_BINDING_CLASS.has(w)) binding = GROUP_BINDING_CLASS.get(w);
+      else if (w === "h" && next === "c") binding = "HARD";
+      else if (w === "p" && next === "b") binding = "SOFT";
+    }
+    if (GROUP_EDITION_MARKERS.has(w)) editions.add(w);
+    if (w === "set" || w === "sets" || w === "סט") isSet = true;
+    const num = asNum(w);
+    // "5 vol" / "5 כרכים" / "ה כרכים": a number directly before a
+    // volume word is the set's volume count.
+    if (num !== undefined && next !== undefined && GROUP_NUM_WORDS.has(next)) {
+      if (count === null) count = num;
+      isSet = true;
+      continue;
+    }
+    // "vol 2" / "חלק ב" / "chelek alef": one volume of a series — a
+    // part label. Consecutive numeral words are one label ("yud beis").
+    if (GROUP_PART_WORDS.has(w) && next !== undefined && asNum(next) !== undefined) {
+      const label = [];
+      let k = i + 1;
+      while (k < words.length && asNum(words[k]) !== undefined) { label.push(String(asNum(words[k]))); k++; }
+      partTokens.push(label.join(" "));
+      i = k - 1;
+      continue;
+    }
+    if (/^\d+$/.test(w)) { partTokens.push(w); continue; }
+    if (GROUP_DRESSING.has(w)) continue;
+    // A lone letter (either alphabet) is an initial or a detached
+    // prefix/article, never the sefer's name.
+    if (w.length === 1) continue;
+    coreSet.add(w);
+  }
+  const core = [...coreSet].sort();
+  return {
+    core,
+    coreKey: core.join(" "),
+    count,
+    part: partTokens.join(" "),
+    sizeClass,
+    binding,
+    isSet,
+    editions: [...editions].sort(),
+  };
+}
+
+// Hard conflicts: stated facts that cannot both describe one item.
+// Missing facts never conflict — that is what the AI check is for.
+function signaturesConflict(a, b) {
+  if (a.count !== null && b.count !== null && a.count !== b.count) return true;
+  if (a.part && b.part && a.part !== b.part) return true;
+  if ((a.count !== null && b.part) || (b.count !== null && a.part)) return true;
+  // A stated set (even with no volume count) is never one volume of it.
+  if ((a.isSet && b.part) || (b.isSet && a.part)) return true;
+  if (a.sizeClass && b.sizeClass && a.sizeClass !== b.sizeClass) return true;
+  if (a.binding && b.binding && a.binding !== b.binding) return true;
+  if (a.editions.length && b.editions.length && a.editions.join(",") !== b.editions.join(",")) return true;
+  return false;
+}
+
+function groupProducts(entries) {
+  const sigs = entries.map((e) => productSignature(e.title));
+  const byPrice = (x, y) => (entries[x].priceAmount ?? 1e12) - (entries[y].priceAmount ?? 1e12);
+  const order = entries.map((_, i) => i).sort(byPrice);
+  const groups = [];
+  const byCore = new Map();
+  const strictSame = (a, b) =>
+    a.count === b.count && a.part === b.part && a.sizeClass === b.sizeClass && a.binding === b.binding && a.isSet === b.isSet;
+  for (const idx of order) {
+    const sig = sigs[idx];
+    let placed = false;
+    if (sig.coreKey) {
+      for (const gi of byCore.get(sig.coreKey) ?? []) {
+        const g = groups[gi];
+        if (g.stores.has(entries[idx].storeId)) continue;
+        const fits = g.members.every((mi) =>
+          !signaturesConflict(sigs[mi], sig) && (sig.core.length > 1 || strictSame(sigs[mi], sig)));
+        if (fits) {
+          g.members.push(idx);
+          g.stores.add(entries[idx].storeId);
+          placed = true;
+          break;
+        }
+      }
+    }
+    if (!placed) {
+      groups.push({ members: [idx], stores: new Set([entries[idx].storeId]) });
+      if (sig.coreKey) {
+        if (!byCore.has(sig.coreKey)) byCore.set(sig.coreKey, []);
+        byCore.get(sig.coreKey).push(groups.length - 1);
+      }
+    }
+  }
+  return groups.map((g) => g.members.map((i) => entries[i]).sort((a, b) => (a.priceAmount ?? 1e12) - (b.priceAmount ?? 1e12)));
+}
+
+// Pairs the rules could not settle, best first, for the AI check:
+// different stores, not already grouped together, no hard conflict,
+// and cores that overlap meaningfully.
+function matchCandidates(entries, groups) {
+  const groupOf = new Map();
+  groups.forEach((members, gi) => members.forEach((e) => groupOf.set(e, gi)));
+  const sigOf = new Map(entries.map((e) => [e, productSignature(e.title)]));
+  const out = [];
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      const a = entries[i];
+      const b = entries[j];
+      if (a.storeId === b.storeId) continue;
+      if (groupOf.get(a) === groupOf.get(b)) continue;
+      const sa = sigOf.get(a);
+      const sb = sigOf.get(b);
+      if (!sa.core.length || !sb.core.length) continue;
+      if (signaturesConflict(sa, sb)) continue;
+      const setB = new Set(sb.core);
+      const inter = sa.core.filter((w) => setB.has(w)).length;
+      if (!(inter >= 2 || (inter >= 1 && sa.core.length <= 3 && sb.core.length <= 3))) continue;
+      const union = new Set([...sa.core, ...sb.core]).size;
+      out.push({ a, b, score: inter / union });
+    }
+  }
+  out.sort((x, y) => y.score - x.score);
+  return out.slice(0, 16);
+}
+
 export {
   MAX_PER_STORE,
   STORES,
@@ -921,5 +1139,9 @@ export {
   parseVolusion,
   parseWooStoreApi,
   searchStore,
-  sortProducts
+  sortProducts,
+  productSignature,
+  signaturesConflict,
+  groupProducts,
+  matchCandidates
 };

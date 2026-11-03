@@ -166,6 +166,9 @@ body {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* Reserve the full three lines even for a one-line title, so every
+     card in the grid is the same height (Zakkai, 2026-11-03). */
+  min-height: calc(3 * 1.35em);
 }
 .store-badge {
   font-size: 0.76rem;
