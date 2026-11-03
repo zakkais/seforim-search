@@ -25,7 +25,7 @@
 // Searching stays open without signing in, and there is no checkout
 // and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant } from "./app.js?v=10";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant } from "./app.js?v=11";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
@@ -496,6 +496,20 @@ function productCard(store, p, wishMode) {
 let groupSeq = 0;
 let matchCache = {};
 try { matchCache = JSON.parse(localStorage.getItem(LS_MATCHCACHE) || "{}") || {}; } catch { matchCache = {}; }
+// Verdicts are stored as { v, ts }. A "same" verdict is permanent;
+// a "different" verdict expires after a week — the free model is
+// noisy, and one wrong "different" must not freeze a pair forever.
+// (Plain booleans from the first version carry no timestamp: a
+// stored "same" is kept, a stored "different" is treated as stale
+// and re-asked — it may predate the smarter match prompt.)
+const MATCH_FALSE_TTL = 7 * 24 * 3600 * 1000;
+function verdictOf(key) {
+  const rec = matchCache[key];
+  if (rec === undefined) return undefined;
+  if (typeof rec === "boolean") return rec ? true : undefined;
+  if (rec.v === true) return true;
+  return Date.now() - (rec.ts || 0) < MATCH_FALSE_TTL ? false : undefined;
+}
 const pairKeyOf = (a, b) => [a.title, b.title].map((s) => String(s || "").trim().toLowerCase()).sort().join(" || ");
 function saveMatchCache() {
   try { localStorage.setItem(LS_MATCHCACHE, JSON.stringify(matchCache)); } catch { /* private mode etc. */ }
@@ -503,7 +517,7 @@ function saveMatchCache() {
 
 function applyCachedVerdicts(entries, groups) {
   for (const c of matchCandidates(entries, groups)) {
-    if (matchCache[pairKeyOf(c.a, c.b)] !== true) continue;
+    if (verdictOf(pairKeyOf(c.a, c.b)) !== true) continue;
     const gi = groups.findIndex((g) => g.includes(c.a));
     const gj = groups.findIndex((g) => g.includes(c.b));
     if (gi < 0 || gj < 0 || gi === gj) continue;
@@ -526,7 +540,7 @@ let aiCheckInFlight = false;
 function scheduleAiMatchCheck(entries, groups) {
   if (!WORKER_URL || aiCheckInFlight) return;
   const pending = matchCandidates(entries, groups)
-    .filter((c) => !(pairKeyOf(c.a, c.b) in matchCache))
+    .filter((c) => verdictOf(pairKeyOf(c.a, c.b)) === undefined)
     .slice(0, 16);
   if (!pending.length) return;
   aiCheckInFlight = true;
@@ -548,7 +562,7 @@ function scheduleAiMatchCheck(entries, groups) {
       for (const v of data.verdicts) {
         const c = pending[v.i];
         if (!c) continue;
-        matchCache[pairKeyOf(c.a, c.b)] = v.same === true;
+        matchCache[pairKeyOf(c.a, c.b)] = { v: v.same === true, ts: Date.now() };
         if (v.same === true) changed = true;
       }
       saveMatchCache();

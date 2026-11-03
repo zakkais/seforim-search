@@ -1124,7 +1124,13 @@ function matchCandidates(entries, groups) {
       const inter = sa.core.filter((w) => setB.has(w)).length;
       if (!(inter >= 2 || (inter >= 1 && sa.core.length <= 3 && sb.core.length <= 3))) continue;
       const union = new Set([...sa.core, ...sb.core]).size;
-      out.push({ a, b, score: inter / union });
+      let score = inter / union;
+      // One title fully containing the other — the classic "same
+      // book, one store appends the author's name" case ("Healthy
+      // Habits" vs "Healthy Habits - Rivka Schonfeld") — is the
+      // strongest candidate there is; always send it first.
+      if (inter === Math.min(sa.core.length, sb.core.length) && inter >= 2) score = 0.95;
+      out.push({ a, b, score });
     }
   }
   out.sort((x, y) => y.score - x.score);

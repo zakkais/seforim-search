@@ -1141,6 +1141,8 @@ async function handleMatch(request, env, ctx) {
     "same work, same publisher/edition, same number of volumes, same size, same binding.",
     "A title may be in Hebrew in one listing and transliterated English in the other — that alone does not make them different books.",
     "Store dressing differs (words like 'set', 'vol.', publisher names added or dropped); look past it.",
+    "An author's name appended to one title only — at the end, after a dash, or after 'by' — is also dressing: the same sefer, not a different book.",
+    "But a subtitle naming a volume's TOPIC or TRACTATE (for example 'on Bava Kama', 'Musach HaShabbos', a siman range) is a real difference between volumes — answer false for those.",
     "If any stated detail conflicts — different volume counts, different sizes, different bindings — or you cannot tell, answer false for that pair.",
     "Reply with ONLY a JSON array of true/false values, one per pair, in order. No other text.",
   ].join(" ");
