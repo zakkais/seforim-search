@@ -1033,6 +1033,177 @@ async function fetchTextTimeout(url, ms) {
   } catch { return ""; }
 }
 
+// ---------------------------------------------------------------------------
+// Quick view: GET /product?url=<store product URL> returns the store's
+// own gallery images and description for that product, so a card's eye
+// button can show them without leaving the site. Only known store
+// hosts are fetched (this is not a general proxy), results are cached
+// in KV for a week, and prices are deliberately NOT included — the
+// card already shows the live search price, and a cached price here
+// would go stale.
+// ---------------------------------------------------------------------------
+const PRODUCT_HOSTS = new Set([
+  "zbermanbooks.com", "www.zbermanbooks.com",
+  "seforimdeals.com", "www.seforimdeals.com",
+  "seforimplace.com", "www.seforimplace.com",
+  "hamafitz.com", "www.hamafitz.com",
+  "greenfieldjudaica.com", "www.greenfieldjudaica.com",
+  "esicha.org", "www.esicha.org",
+  "store.kehotonline.com",
+]);
+const PRODUCT_CACHE_TTL_MS = 7 * 24 * 3600 * 1000;
+
+function fnvHash(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(36);
+}
+
+// Like stripHtmlText, but keeps paragraph breaks so the modal can
+// render the store's description as paragraphs.
+function htmlToParagraphs(html, cap) {
+  const text = String(html || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<\/(p|div|li|tr|h[1-6])>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&#39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .split("\n").map((l) => l.replace(/[ \t]+/g, " ").trim()).filter(Boolean).join("\n");
+  return text.slice(0, cap || 3000);
+}
+
+function productImagesFromHtml(html, baseUrl) {
+  const out = [];
+  const seen = new Set();
+  const push = (raw) => {
+    if (!raw || typeof raw !== "string") return;
+    let abs;
+    try { abs = new URL(raw.replace(/&amp;/g, "&"), baseUrl).toString(); } catch { return; }
+    if (!/^https:/.test(abs) || seen.has(abs)) return;
+    if (/(logo|icon|sprite|payment|badge|pixel|spacer|blank|loading|favicon)/i.test(abs)) return;
+    if (/(_small|_thumb|_compact|50x|100x)\.(jpe?g|png|webp)/i.test(abs)) return;
+    seen.add(abs);
+    out.push(abs);
+  };
+  // Structured data first — it names the product's own photos.
+  for (const m of html.matchAll(/"image"\s*:\s*(\[[^\]]*\]|"(?:[^"\\]|\\.)*")/g)) {
+    try {
+      const v = JSON.parse(m[1]);
+      if (Array.isArray(v)) v.forEach(push); else push(v);
+    } catch { /* not valid JSON — skip */ }
+  }
+  const og = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) ||
+    html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+  if (og) push(og[1]);
+  // Then the page's own <img> tags, keeping product-photo-shaped URLs.
+  for (const m of html.matchAll(/<img\b[^>]*?(?:src|data-src)="([^"]+)"/gi)) {
+    const raw = m[1];
+    if (/(cdn\/shop\/files|\/media\/catalog\/|image\/cache\/catalog\/|\/images\/|wp-content\/uploads|\/ProductImages|\/products\/)/i.test(raw)) push(raw);
+  }
+  return out.slice(0, 10);
+}
+
+// Page furniture that follows the description inside a container
+// slice (review forms, spec tables, related items). The description
+// ends at the first such line.
+const DESC_CUT_LINES = /^(Write a review|Your Name|Your Review|Reviews?|Related Products?|Tags:|Availability:|Reward Points|Ex Tax:|Note: HTML|Customers? who bought|You may also like|Description\s*$)/i;
+function cutDescription(text) {
+  const lines = String(text || "").split("\n");
+  const cut = lines.findIndex((l) => DESC_CUT_LINES.test(l.trim()));
+  return (cut >= 0 ? lines.slice(0, cut) : lines).join("\n").trim();
+}
+
+function productDescriptionFromHtml(html) {
+  const markers = [
+    'id="tab-description"', "woocommerce-Tabs-panel--description",
+    "product attribute description", 'id="ProductDescription"',
+    "product-description", "short-description",
+  ];
+  for (const marker of markers) {
+    const idx = html.indexOf(marker);
+    if (idx < 0) continue;
+    // Start after the tag that carries the marker, so its attributes
+    // don't leak into the text.
+    const tagEnd = html.indexOf(">", idx);
+    const start = tagEnd > idx && tagEnd - idx < 500 ? tagEnd + 1 : idx;
+    const text = cutDescription(htmlToParagraphs(html.slice(start, start + 12000), 6000)).slice(0, 3000);
+    // Very short results mean the marker was a nav/tab label rather
+    // than the panel itself.
+    if (text.length >= 60) return text;
+  }
+  const ld = html.match(/"description"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (ld) {
+    try {
+      const text = htmlToParagraphs(JSON.parse(`"${ld[1]}"`), 3000);
+      if (text.length >= 40) return text;
+    } catch { /* fall through to meta */ }
+  }
+  const meta = html.match(/<meta[^>]+(?:name|property)="(?:description|og:description)"[^>]+content="([^"]+)"/i) ||
+    html.match(/<meta[^>]+content="([^"]+)"[^>]+(?:name|property)="(?:description|og:description)"/i);
+  return meta ? htmlToParagraphs(meta[1], 3000) : "";
+}
+
+async function handleProduct(request, env, ctx) {
+  const target = (new URL(request.url).searchParams.get("url") || "").trim();
+  let u;
+  try { u = new URL(target); } catch { return jsonResponse({ error: "Bad url" }, 400, request); }
+  if (u.protocol !== "https:" || !PRODUCT_HOSTS.has(u.hostname)) {
+    return jsonResponse({ error: "Store not supported for quick view" }, 400, request);
+  }
+  // Bump the pv<N> prefix when the extractors change, so cached
+  // extractions from an older, buggier version are not served.
+  const cacheKey = `pv2:${fnvHash(u.toString())}`;
+  if (env.SEFORIM_KV) {
+    try {
+      const raw = await env.SEFORIM_KV.get(cacheKey);
+      if (raw) {
+        const v = JSON.parse(raw);
+        if (Date.now() - (v.ts || 0) < PRODUCT_CACHE_TTL_MS) {
+          return jsonResponse({ url: u.toString(), title: v.title || "", images: v.images || [], description: v.description || "" }, 200, request);
+        }
+      }
+    } catch { /* treat as a miss */ }
+  }
+  let title = "";
+  let images = [];
+  let description = "";
+  try {
+    if (u.hostname.includes("seforimdeals.com") && u.pathname.startsWith("/products/")) {
+      const raw = await fetchTextTimeout(`${u.origin}${u.pathname}.js`, 5000);
+      if (raw) {
+        const j = JSON.parse(raw);
+        title = cleanText(j.title || "");
+        if (Array.isArray(j.images)) {
+          images = j.images.map((im) => (typeof im === "string" ? im : im?.src)).filter(Boolean).slice(0, 10);
+        } else if (j.image) {
+          images = [typeof j.image === "string" ? j.image : j.image.src].filter(Boolean);
+        }
+        description = htmlToParagraphs(j.description || "", 3000);
+      }
+    }
+    if (!images.length || !description) {
+      const html = await fetchTextTimeout(u.toString(), 6000);
+      if (html) {
+        if (!title) {
+          const ogt = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i);
+          title = ogt ? stripHtmlText(ogt[1], 200) : "";
+        }
+        if (!images.length) images = productImagesFromHtml(html, u.toString());
+        if (!description) description = productDescriptionFromHtml(html);
+      }
+    }
+  } catch { /* return whatever was gathered */ }
+  if (!images.length && !description) {
+    return jsonResponse({ error: "No details found at the store" }, 502, request);
+  }
+  if (env.SEFORIM_KV && ctx) {
+    ctx.waitUntil(env.SEFORIM_KV.put(cacheKey, JSON.stringify({ title, images, description, ts: Date.now() })).catch(() => {}));
+  }
+  return jsonResponse({ url: u.toString(), title, images, description }, 200, request);
+}
+
 async function chatProductDetail(p) {
   try {
     const u = new URL(p.url);
@@ -1318,6 +1489,9 @@ export default {
     }
     if (url.pathname === "/match") {
       return handleMatch(request, env, ctx);
+    }
+    if (url.pathname === "/product") {
+      return handleProduct(request, env, ctx);
     }
     if (url.pathname === "/stores") {
       return jsonResponse({ stores: STORES.map((s) => ({ id: s.id, name: s.name, note: s.note ?? null })) }, 200, request);

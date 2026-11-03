@@ -63,6 +63,7 @@ const I18N = {
     footerNote: "Listings, covers, and prices come live from each store's own website at search time. Searching needs no account; signing in with Google is optional and only syncs your wishlist. Your store choices and your local wishlist are kept in your own browser.",
     storesIncluded: "Stores · {n} of {total} included",
     save: "♡", saved: "♥", remove: "Remove", onSale: "On sale", soldOut: "Sold out", inStores: "In {n} stores", priceAtStore: "Price at store",
+    quickView: "Quick view", visitStore: "View at store", loadingDetails: "Loading details…", detailsError: "Couldn’t load the details — they’re on the store’s page.", noDescription: "No description available from the store.",
     scan: "Scan ISBN", scanTitle: "Scan an ISBN or QR code", scanHint: "Point the camera at the barcode on the back of the sefer.", scanUnsupported: "Scanning is not supported in this browser — type the ISBN into the search box instead.", cancel: "Cancel",
     chatTitle: "Ask about a sefer", chatNote: "Prototype — it answers from the stores' listings and product pages, and checks ChabadLibrary when a question names a sefer in Hebrew. What it can't verify, it says so.", chatPlaceholder: "Ask about a sefer…", chatSend: "Send", backToTop: "Back to top", chatWelcome: "Shalom! Ask me about a sefer — for example, which store has it cheapest, or whether it's sold out anywhere.", chatThinking: "Checking the stores…", chatError: "The chat couldn't answer just now — please try again.",
     newReleases: "New & just in", shippingTax: "Shipping & tax", shipNote: "What each store itself publishes about its shipping and tax. Where a store publishes no rate, only its own checkout has the real number — this page doesn't guess.",
@@ -90,6 +91,7 @@ const I18N = {
     footerNote: "המודעות, הכריכות והמחירים מגיעים בשידור חי מאתר כל חנות בעת החיפוש. החיפוש אינו דורש חשבון; כניסה עם גוגל היא אופציונלית ורק מסנכרנת את רשימת הספרים השמורים. בחירת החנויות ורשימת הספרים המקומית נשמרות בדפדפן שלך.",
     storesIncluded: "חנויות · {n} מתוך {total} כלולות",
     save: "♡", saved: "♥", remove: "הסר", onSale: "במבצע", soldOut: "אזל מהמלאי", inStores: "ב-{n} חנויות", priceAtStore: "מחיר בחנות",
+    quickView: "מבט מהיר", visitStore: "לצפייה בחנות", loadingDetails: "טוען פרטים…", detailsError: "לא ניתן לטעון את הפרטים — הם מופיעים בדף החנות.", noDescription: "אין תיאור זמין מהחנות.",
     scan: "סריקת ISBN", scanTitle: "סריקת ISBN או קוד QR", scanHint: "כוונו את המצלמה אל הברקוד שבגב הספר.", scanUnsupported: "הסריקה אינה נתמכת בדפדפן זה — הקלידו את ה-ISBN בתיבת החיפוש.", cancel: "ביטול",
     chatTitle: "שאל על ספר", chatNote: "אב־טיפוס — עונה ממודעות החנויות ומדפי המוצר, ובשאלה שמזכירה ספר בעברית בודק גם ב-ChabadLibrary. מה שאינו יכול לאמת — הוא אומר זאת.", chatPlaceholder: "שאל על ספר…", chatSend: "שלח", backToTop: "חזרה למעלה", chatWelcome: "שלום! שאל אותי על ספר — למשל, באיזו חנות הוא הכי זול, או אם הוא אזל באיזו חנות.", chatThinking: "בודק בחנויות…", chatError: "הצ׳אט לא הצליח לענות כרגע — נסה שוב.",
     newReleases: "חדש והגיע", shippingTax: "משלוח ומס", shipNote: "מה שכל חנות מפרסמת בעצמה על המשלוח והמס שלה. חנות שלא מפרסמת מחיר — רק בקופה שלה יש את המספר האמיתי; העמוד הזה לא מנחש.",
@@ -117,6 +119,7 @@ const I18N = {
     footerNote: "ליסטינגס, דעקלעך און פּרײַזן קומען לעבעדיק פֿון יעדער קראָם׳ס אייגענער וועבזײַט בעת דעם זוכן. זוכן דאַרף קיין חשבון; אײַנצייכענען מיט גוגל איז פֿרײַוויליק און סינקראָניזירט נאָר אײַער ווישליסט. אײַערע קראָם־קלייַבן און לאָקאַלע ווישליסט ווערן געהאַלטן אין אײַער בלעטערער.",
     storesIncluded: "קראָמען · {n} פֿון {total} אַרײַנגענומען",
     save: "♡", saved: "♥", remove: "אַראָפּנעמען", onSale: "אויף סעיל", soldOut: "אויספאַרקויפט", inStores: "אין {n} קראָמען", priceAtStore: "פּרײַז אין קראָם",
+    quickView: "שנעלער בליק", visitStore: "זען אין קראָם", loadingDetails: "לאָדט דעטאַלן…", detailsError: "די דעטאַלן האָבן זיך ניט געלאָדט — זיי זענען אויפֿן קראָם־בלאַט.", noDescription: "קיין באַשרײַבונג פֿון דער קראָם.",
     scan: "סקענען ISBN", scanTitle: "סקענען אַן ISBN אָדער QR קאָד", scanHint: "ווײַזט די קאַמעראַ אויפֿן באַרקאָד אויפֿן רוקן פֿונעם ספֿר.", scanUnsupported: "סקענען ווערט נישט געשטיצט אין דעם בלעטערער — טיפּט דעם ISBN אין דער זוך־קעסטל.", cancel: "אָפּזאָגן",
     chatTitle: "פֿרעגט וועגן אַ ספר", chatNote: "פּראָטאָטיפּ — ענטפֿערט פֿון די ליסטינגס און פּראָדוקט־בלעטער פֿון די קראָמען, און קוקט אין ChabadLibrary ווען די פֿראַגע רופט אַ ספר אויף העברעיִש. וואָס עס קען נישט באַשטעטיקן, זאָגט עס.", chatPlaceholder: "פֿרעגט וועגן אַ ספר…", chatSend: "שיקן", backToTop: "צוריק אַרויף", chatWelcome: "שלום! פֿרעגט מיך וועגן אַ ספר — למשל, אין וועלכער קראָם איז עס די ביליקסטע, אָדער צי עס איז ערגעץ אויספאַרקויפט.", chatThinking: "קוקט אין די קראָמען…", chatError: "דער טשאַט האָט איצט נישט געקענט ענטפֿערן — פּרוּווט נאָך אַ מאָל.",
     newReleases: "נײַ און פֿריש אָנגעקומען", shippingTax: "שיפּינג און שטײַער", shipNote: "וואָס יעדער קראָם גיט אַליין אָן וועגן זײַן שיפּינג און שטײַער. אַ קראָם וואָס גיט נישט אָן קיין פּרײַז — נאָר בײַם קאַסע איז דאָ דער עכטער נומער; דער בלאַט טרעפֿט נישט.",
@@ -144,6 +147,7 @@ const I18N = {
     footerNote: "Los anuncios, portadas y precios llegan en vivo desde el sitio web de cada tienda al buscar. Buscar no necesita cuenta; iniciar sesión con Google es opcional y solo sincroniza tu lista de deseos. Tus tiendas elegidas y tu lista local se guardan en tu navegador.",
     storesIncluded: "Tiendas · {n} de {total} incluidas",
     save: "♡", saved: "♥", remove: "Quitar", onSale: "En oferta", soldOut: "Agotado", inStores: "En {n} tiendas", priceAtStore: "Precio en tienda",
+    quickView: "Vista rápida", visitStore: "Ver en la tienda", loadingDetails: "Cargando detalles…", detailsError: "No se pudieron cargar los detalles; están en la página de la tienda.", noDescription: "La tienda no ofrece descripción.",
     scan: "Escanear ISBN", scanTitle: "Escanea un ISBN o código QR", scanHint: "Apunta la cámara al código de barras en la parte trasera del libro.", scanUnsupported: "El escaneo no es compatible con este navegador: escribe el ISBN en el cuadro de búsqueda.", cancel: "Cancelar",
     chatTitle: "Pregunta por un séfer", chatNote: "Prototipo: responde desde los listados y las páginas de producto de las tiendas, y consulta ChabadLibrary cuando una pregunta nombra un séfer en hebreo. Lo que no puede verificar, lo dice.", chatPlaceholder: "Pregunta por un séfer…", chatSend: "Enviar", backToTop: "Volver arriba", chatWelcome: "¡Shalom! Pregúntame por un séfer: por ejemplo, en qué tienda está más barato o si está agotado en alguna.", chatThinking: "Revisando las tiendas…", chatError: "El chat no pudo responder ahora. Inténtalo de nuevo.",
     newReleases: "Novedades", shippingTax: "Envío e impuestos", shipNote: "Lo que cada tienda publica sobre sus envíos e impuestos. Si una tienda no publica tarifas, solo su caja tiene el número real: esta página no lo inventa.",
@@ -171,6 +175,7 @@ const I18N = {
     footerNote: "Les annonces, couvertures et prix proviennent en direct du site de chaque boutique au moment de la recherche. La recherche ne nécessite aucun compte ; se connecter avec Google est facultatif et ne fait que synchroniser votre liste de souhaits. Vos boutiques choisies et votre liste locale sont conservées dans votre navigateur.",
     storesIncluded: "Boutiques · {n} sur {total} incluses",
     save: "♡", saved: "♥", remove: "Retirer", onSale: "En solde", soldOut: "Épuisé", inStores: "Dans {n} boutiques", priceAtStore: "Prix en boutique",
+    quickView: "Aperçu rapide", visitStore: "Voir en boutique", loadingDetails: "Chargement des détails…", detailsError: "Impossible de charger les détails — ils sont sur la page de la boutique.", noDescription: "Aucune description de la boutique.",
     scan: "Scanner l'ISBN", scanTitle: "Scanner un ISBN ou un code QR", scanHint: "Pointez l'appareil photo vers le code-barres au dos du livre.", scanUnsupported: "La numérisation n'est pas prise en charge dans ce navigateur — saisissez l'ISBN dans la zone de recherche.", cancel: "Annuler",
     chatTitle: "Demander un séfer", chatNote: "Prototype : répond à partir des listes et des pages produits des boutiques, et consulte ChabadLibrary quand une question nomme un séfer en hébreu. Ce qu'il ne peut pas vérifier, il le dit.", chatPlaceholder: "Demandez un séfer…", chatSend: "Envoyer", backToTop: "Retour en haut", chatWelcome: "Shalom ! Demandez-moi un séfer — par exemple, dans quelle boutique il est le moins cher, ou s'il est épuisé quelque part.", chatThinking: "Vérification des boutiques…", chatError: "Le chat n'a pas pu répondre. Réessayez.",
     newReleases: "Nouveautés", shippingTax: "Expédition et taxes", shipNote: "Ce que chaque boutique publie elle-même sur son expédition et ses taxes. Si une boutique ne publie aucun tarif, seule sa caisse donne le vrai montant — cette page ne devine pas.",
@@ -372,6 +377,62 @@ function renderWishlistCount() {
   el.textContent = n ? `(${n})` : "";
 }
 
+// Quick view: the eye button on a card opens a modal with the
+// store's own photos (swipeable) and description, fetched on demand
+// from the worker's /product endpoint. The card's data fills in
+// instantly; the store details stream in behind a spinner.
+let qvSeq = 0;
+async function openQuickView(url) {
+  const modalEl = $("#qv-modal");
+  if (!modalEl || !window.bootstrap || !WORKER_URL) { window.open(url, "_blank", "noopener"); return; }
+  const hit = productByUrl.get(url);
+  const wishItem = !hit ? wishlist.items.find((i) => i.url === url) : null;
+  const p = hit?.product || (wishItem
+    ? { title: wishItem.title, priceText: wishItem.priceText, compareAtText: wishItem.compareAtText, imageUrl: wishItem.imageUrl }
+    : null);
+  const storeName = hit?.store?.name || wishItem?.storeName || "";
+  $("#qv-title").textContent = p?.title || t("quickView");
+  $("#qv-price").innerHTML = p?.priceText
+    ? `<span class="fw-bold price">${esc(p.priceText)}</span>` +
+      (p.compareAtText ? `<span class="text-secondary text-decoration-line-through small ms-2">${esc(p.compareAtText)}</span>` : "")
+    : "";
+  $("#qv-store").textContent = storeName;
+  $("#qv-visit").href = url;
+  $("#qv-body").innerHTML = `
+    <div class="d-flex align-items-center gap-2 text-secondary py-4 justify-content-center">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>${t("loadingDetails")}</span>
+    </div>`;
+  window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  const seq = ++qvSeq;
+  try {
+    const res = await fetch(`${WORKER_URL}/product?url=${encodeURIComponent(url)}`);
+    if (!res.ok) throw new Error(`product ${res.status}`);
+    const d = await res.json();
+    if (seq !== qvSeq) return; // a newer quick view owns the modal now
+    const images = (Array.isArray(d.images) && d.images.length ? d.images : [p?.imageUrl]).filter(Boolean);
+    let html = "";
+    if (images.length) {
+      const slides = images.map((src, i) => `
+        <div class="carousel-item${i === 0 ? " active" : ""}">
+          <div class="ratio ratio-4x3 bg-body-tertiary rounded"><img src="${esc(src)}" alt="" class="object-fit-contain" loading="lazy"></div>
+        </div>`).join("");
+      const controls = images.length > 1 ? `
+        <button class="carousel-control-prev" type="button" data-bs-target="#qv-carousel" data-bs-slide="prev"><span class="carousel-control-prev-icon bg-dark bg-opacity-50 rounded-circle" aria-hidden="true"></span><span class="visually-hidden">Previous</span></button>
+        <button class="carousel-control-next" type="button" data-bs-target="#qv-carousel" data-bs-slide="next"><span class="carousel-control-next-icon bg-dark bg-opacity-50 rounded-circle" aria-hidden="true"></span><span class="visually-hidden">Next</span></button>` : "";
+      html += `<div id="qv-carousel" class="carousel slide mb-3" data-bs-interval="false" data-bs-touch="true"><div class="carousel-inner">${slides}</div>${controls}</div>`;
+    }
+    if (p?.soldOut) html += `<p><span class="badge rounded-pill text-bg-secondary text-uppercase">${t("soldOut")}</span></p>`;
+    const desc = String(d.description || "").trim();
+    html += desc
+      ? desc.split(/\n+/).filter(Boolean).map((para) => `<p class="mb-2">${esc(para)}</p>`).join("")
+      : `<p class="text-secondary small mb-0">${t("noDescription")}</p>`;
+    $("#qv-body").innerHTML = html;
+  } catch {
+    if (seq !== qvSeq) return;
+    $("#qv-body").innerHTML = `<p class="text-secondary mb-0">${t("detailsError")}</p>`;
+  }
+}
+
 function toggleWish(url) {
   const found = productByUrl.get(url);
   const idx = wishlist.items.findIndex((i) => i.url === url);
@@ -446,6 +507,7 @@ function renderStoresButton() {
 
 const BOOK_SVG = `<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 4.5v15Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>`;
 const FALLBACK_IMG = `<div class="product-img d-flex align-items-center justify-content-center text-secondary">${BOOK_SVG}</div>`;
+const EYE_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`;
 
 function cardInner(store, p, wishMode) {
   const price = p.priceText
@@ -471,7 +533,7 @@ function cardInner(store, p, wishMode) {
           <a href="${esc(p.url)}" target="_blank" rel="noopener noreferrer"
              class="stretched-link font-display fw-medium text-decoration-none product-title"
              aria-label="View ${esc(p.title)} at ${esc(store.name)}">${esc(p.title)}</a>
-          <div class="mt-auto pt-2 d-flex justify-content-between align-items-center gap-2"><p class="mb-0">${price}</p>${wishBtn}</div>
+          <div class="mt-auto pt-2 d-flex justify-content-between align-items-center gap-2"><p class="mb-0">${price}</p><span class="d-flex gap-1 align-items-center"><button type="button" class="btn btn-sm btn-outline-secondary position-relative z-2" data-qv-url="${esc(p.url)}" aria-label="${t("quickView")}" title="${t("quickView")}">${EYE_SVG}</button>${wishBtn}</span></div>
         </div>`;
 }
 
@@ -1039,6 +1101,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // One delegated handler for all wishlist buttons (search results and
   // wishlist view alike), so re-renders never lose their wiring.
   document.addEventListener("click", (e) => {
+    const qvBtn = e.target.closest("[data-qv-url]");
+    if (qvBtn) { openQuickView(qvBtn.getAttribute("data-qv-url")); return; }
     const wishBtn = e.target.closest("[data-wish-url]");
     if (wishBtn) { toggleWish(wishBtn.getAttribute("data-wish-url")); return; }
     const titleBtn = e.target.closest("[data-wish-title]");
