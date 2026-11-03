@@ -177,6 +177,31 @@
     </footer>
   </main>
 
+  <!-- Chat prototype: a floating button (bottom corner) opening a
+       Bootstrap offcanvas panel. Placement is the prototype's choice —
+       the panel can move into a future bottom navbar later without
+       any back-end change. ui.js wires it to the worker's /chat. -->
+  <button type="button" id="chat-fab" class="btn btn-primary rounded-circle shadow position-fixed bottom-0 end-0 m-3 z-3 d-flex align-items-center justify-content-center"
+          style="width:3.5rem;height:3.5rem" data-bs-toggle="offcanvas" data-bs-target="#chat-panel"
+          aria-controls="chat-panel" aria-label="Ask about a sefer">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  </button>
+
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="chat-panel" aria-labelledby="chat-panel-title">
+    <div class="offcanvas-header">
+      <h2 class="offcanvas-title fs-5 font-display" id="chat-panel-title" data-i18n="chatTitle">Ask about a sefer</h2>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column pt-0">
+      <p class="text-secondary small" data-i18n="chatNote">Prototype — it answers only from the stores' current listings.</p>
+      <div id="chat-messages" class="flex-grow-1 overflow-auto d-flex flex-column gap-2 mb-3" aria-live="polite"></div>
+      <form id="chat-form" class="d-flex gap-2">
+        <input type="text" id="chat-input" class="form-control" autocomplete="off" maxlength="500" data-i18n-placeholder="chatPlaceholder" placeholder="Ask about a sefer…">
+        <button type="submit" id="chat-send" class="btn btn-primary" data-i18n="chatSend">Send</button>
+      </form>
+    </div>
+  </div>
+
   <!-- ISBN / QR scanner: a Bootstrap modal opened by the scan button
        inside the search bar. ui.js runs the camera while it is open. -->
   <div class="modal fade" id="scan-modal" tabindex="-1" aria-labelledby="scan-modal-title" aria-hidden="true">
@@ -255,6 +280,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script type="module" src="./ui.js?v=15"></script>
+  <script type="module" src="./ui.js?v=16"></script>
 </body>
 </html>
