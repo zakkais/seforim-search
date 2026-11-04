@@ -25,7 +25,7 @@
 // Searching stays open without signing in, and there is no checkout
 // and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant } from "./app.js?v=11";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant } from "./app.js?v=12";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
@@ -647,15 +647,14 @@ function groupCard(members) {
   return `
     <div class="col">
       <div class="card h-100 shadow-sm position-relative">
-        <div class="px-2 pt-2 d-flex align-items-center justify-content-between position-relative z-2">
+        <div class="px-2 pt-2 d-flex align-items-center position-relative z-2">
           <span class="badge rounded-pill text-bg-primary">${t("inStores", { n: members.length })}</span>
-          <span class="btn-group btn-group-sm" role="group" aria-label="Stores">
-            <button type="button" class="btn btn-outline-secondary py-0 px-2" data-bs-target="#${id}" data-bs-slide="prev" aria-label="Previous store">&#8249;</button>
-            <button type="button" class="btn btn-outline-secondary py-0 px-2" data-bs-target="#${id}" data-bs-slide="next" aria-label="Next store">&#8250;</button>
-          </span>
         </div>
         <div id="${id}" class="carousel slide" data-bs-interval="false" data-bs-touch="true">
           <div class="carousel-inner">${slides}
+          </div>
+          <div class="carousel-indicators store-dots position-static m-0 pt-1">
+            ${members.map((m, i) => `<button type="button" data-bs-target="#${id}" data-bs-slide-to="${i}"${i === 0 ? ` class="active" aria-current="true"` : ""} aria-label="Store ${i + 1}"></button>`).join("")}
           </div>
         </div>
       </div>

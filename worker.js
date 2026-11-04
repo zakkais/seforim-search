@@ -1281,8 +1281,8 @@ async function chatLibrarySources(question) {
 // A daily cap protects the free AI allowance; over the cap the
 // endpoint returns no verdicts and the rules simply stand.
 // ---------------------------------------------------------------------------
-const MATCH_DAILY_CAP = 400;
-const MATCH_MAX_PAIRS = 16;
+const MATCH_DAILY_CAP = 1000;
+const MATCH_MAX_PAIRS = 40;
 async function handleMatch(request, env, ctx) {
   const noStore = { "Cache-Control": "no-store" };
   if (request.method !== "POST") return jsonResponse({ error: "POST only" }, 405, request, noStore);
@@ -1313,6 +1313,8 @@ async function handleMatch(request, env, ctx) {
     "A title may be in Hebrew in one listing and transliterated English in the other — that alone does not make them different books.",
     "Store dressing differs (words like 'set', 'vol.', publisher names added or dropped); look past it.",
     "An author's name appended to one title only — at the end, after a dash, or after 'by' — is also dressing: the same sefer, not a different book.",
+    "So is a publisher's name (for example Yahadus) or an editor's name (for example 'Weiss Edition') appearing in one title only, when the sefer and format otherwise agree. But a name that marks a different TRANSLATION or COMMENTARY edition (for example Steinsaltz or Schottenstein) IS a different book — answer false for those.",
+    "Packaging words (shrink wrapped, slipcased, slipcase) are dressing, never a difference.",
     "But a subtitle naming a volume's TOPIC or TRACTATE (for example 'on Bava Kama', 'Musach HaShabbos', a siman range) is a real difference between volumes — answer false for those.",
     "If any stated detail conflicts — different volume counts, different sizes, different bindings — or you cannot tell, answer false for that pair.",
     "Reply with ONLY a JSON array of true/false values, one per pair, in order. No other text.",

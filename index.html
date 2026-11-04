@@ -42,7 +42,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link href="./styles.css?v=12" rel="stylesheet">
+  <link href="./styles.css?v=13" rel="stylesheet">
 </head>
 <body>
   <main class="container py-4 py-md-5" style="max-width:1120px">
@@ -77,10 +77,8 @@
           <li class="nav-item"><a class="nav-link" href="https://www.sefaria.org/" target="_blank" rel="noopener noreferrer">Sefaria <span aria-hidden="true">↗</span></a></li>
         </ul>
       </div>
-    </nav>
-
-    <section class="pt-2">
-      <form id="search-form" role="search" class="mt-4">
+      <section class="w-100">
+        <form id="search-form" role="search" class="mt-2">
         <div class="input-group input-group-lg shadow-sm">
           <label for="sefer-search" class="visually-hidden">Search for a sefer</label>
           <input id="sefer-search" type="search" class="form-control search-input"
@@ -88,8 +86,9 @@
           <button id="scan-btn" type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#scan-modal" aria-label="Scan ISBN or QR code" title="Scan ISBN / QR"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 5v14"/><path d="M8 5v14"/><path d="M11 5v9"/><path d="M14.5 5v14"/><path d="M17.5 5v9"/><path d="M21 5v14"/></svg></button>
           <button id="search-btn" type="submit" class="btn btn-navy fw-semibold px-3" disabled aria-label="Search"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
         </div>
-      </form>
-    </section>
+        </form>
+      </section>
+    </nav>
 
     <section class="mt-4 d-flex flex-wrap align-items-center gap-2" aria-label="Search filters">
       <button id="stores-toggle" type="button" class="btn fw-medium btn-outline-secondary" aria-expanded="false" aria-label="Toggle stores panel">
@@ -306,6 +305,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script type="module" src="./ui.js?v=23"></script>
+  <script type="module" src="./ui.js?v=24"></script>
 </body>
 </html>
