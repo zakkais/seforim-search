@@ -58,7 +58,7 @@ section("1. Syntax");
 
 // ---------------------------------------------------------------------------
 section("2. Asset versions");
-const EXPECTED = { ui: 25, styles: 13, app: 13 };
+const EXPECTED = { ui: 26, styles: 13, app: 14 };
 {
   const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
   const uiSrc = readFileSync(join(ROOT, "ui.js"), "utf8");
@@ -206,6 +206,20 @@ const P = (title, storeId, priceAmount) => ({
     const zbTm5 = P("Tehillim - Tehillos Menachem - 5 Vol Set", "zberman", 60);
     check("grouping: the 5-vol Tehillos Menachem set stays apart from the 1-vol",
       !sameGroup(groupsOf([zbTm5, esichaTm]), zbTm5, esichaTm));
+    // Identical titles, very different prices: different editions
+    // the listings don't describe (two printings of Tehillim
+    // HaChida, $7 vs $24). Rules must refuse; the pair still goes
+    // to the AI check, which now sees both prices.
+    const chidaCheap = P('תהלים החיד"א', "zberman", 7);
+    const chidaDear = { ...P('תהלים החיד"א', "seforimdeals", 24), compareAtText: "$26.95" };
+    check("grouping: identical titles with a big price gap do not rule-group",
+      !sameGroup(groupsOf([chidaCheap, chidaDear]), chidaCheap, chidaDear));
+    const chidaCands = app.matchCandidates([chidaCheap, chidaDear], [[chidaCheap], [chidaDear]]);
+    check("candidates: the price-gap pair is still offered to the AI check", chidaCands.length === 1);
+    const ploniA = P("Sefer Ploni", "zberman", 40);
+    const ploniB = P("Sefer Ploni", "seforimdeals", 52);
+    check("grouping: identical titles at ordinary prices group",
+      sameGroup(groupsOf([ploniA, ploniB]), ploniA, ploniB));
     // A store listing the identical product twice (slipcase page +
     // shrink-wrapped page) joins the group as another slide.
     const zbA = P("Tehillim / Psalms - 2 Volume Set", "zberman", 55);
