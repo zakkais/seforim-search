@@ -1315,6 +1315,7 @@ async function handleMatch(request, env, ctx) {
     "An author's name appended to one title only — at the end, after a dash, or after 'by' — is also dressing: the same sefer, not a different book.",
     "So is a publisher's name (for example Yahadus) or an editor's name (for example 'Weiss Edition') appearing in one title only, when the sefer and format otherwise agree. But a name that marks a different TRANSLATION or COMMENTARY edition (for example Steinsaltz or Schottenstein) IS a different book — answer false for those.",
     "Packaging words (shrink wrapped, slipcased, slipcase) are dressing, never a difference.",
+    "If the two prices differ by more than about two and a half times, that usually means different editions or sizes of the same sefer — answer false, unless both titles clearly state the same edition, size and volume count.",
     "But a subtitle naming a volume's TOPIC or TRACTATE (for example 'on Bava Kama', 'Musach HaShabbos', a siman range) is a real difference between volumes — answer false for those.",
     "If any stated detail conflicts — different volume counts, different sizes, different bindings — or you cannot tell, answer false for that pair.",
     "Reply with ONLY a JSON array of true/false values, one per pair, in order. No other text.",
