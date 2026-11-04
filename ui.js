@@ -25,7 +25,7 @@
 // Searching stays open without signing in, and there is no checkout
 // and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant } from "./app.js?v=13";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant } from "./app.js?v=14";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
@@ -612,8 +612,8 @@ function scheduleAiMatchCheck(entries, groups) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       pairs: pending.map((c) => ({
-        a: { title: c.a.title, store: c.a.store?.name || c.a.storeId, price: c.a.priceText || "" },
-        b: { title: c.b.title, store: c.b.store?.name || c.b.storeId, price: c.b.priceText || "" },
+        a: { title: c.a.title, store: c.a.store?.name || c.a.storeId, price: (c.a.priceText || "") + (c.a.compareAtText ? ` (list ${c.a.compareAtText})` : "") },
+        b: { title: c.b.title, store: c.b.store?.name || c.b.storeId, price: (c.b.priceText || "") + (c.b.compareAtText ? ` (list ${c.b.compareAtText})` : "") },
       })),
     }),
   })

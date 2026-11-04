@@ -1078,6 +1078,24 @@ function groupProducts(entries) {
   // the 5-vol set). Rules never merge those; the AI check may.
   const setMismatch = (a, b) =>
     a.isSet !== b.isSet && !(a.count !== null && b.count !== null);
+  // Identical titles can still be different editions — the stores
+  // don't always state publisher or size (two different printings
+  // of Tehillim HaChida, one $7 and one $24, merged on titles
+  // alone). A large price gap is the tell: when the reference
+  // prices (list price where shown, else the selling price) differ
+  // by more than ~2.5x, rules refuse and the pair goes to the AI
+  // check with both prices visible.
+  const refPrice = (e) => {
+    const cmp = e.compareAtText ? parseFloat(String(e.compareAtText).replace(/[^0-9.]/g, "")) : NaN;
+    if (Number.isFinite(cmp) && cmp > 0) return cmp;
+    return typeof e.priceAmount === "number" && e.priceAmount > 0 ? e.priceAmount : null;
+  };
+  const priceGap = (ea, eb) => {
+    const pa = refPrice(ea);
+    const pb = refPrice(eb);
+    if (pa === null || pb === null) return false;
+    return Math.max(pa, pb) / Math.min(pa, pb) > 2.5;
+  };
   for (const idx of order) {
     const sig = sigs[idx];
     let placed = false;
@@ -1099,7 +1117,7 @@ function groupProducts(entries) {
         // — signaturesConflict deliberately does not flag them.
         const fits = g.members.every((mi) =>
           !signaturesConflict(sigs[mi], sig) && (sigs[mi].part || "") === (sig.part || "") &&
-          !setMismatch(sigs[mi], sig) &&
+          !setMismatch(sigs[mi], sig) && !priceGap(entries[mi], entries[idx]) &&
           (sig.core.length > 1 || strictSame(sigs[mi], sig)));
         if (fits) {
           g.members.push(idx);
