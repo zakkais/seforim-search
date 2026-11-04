@@ -22,6 +22,10 @@
    interactive-widget=resizes-content in index.html). */
 #chat-panel { height: 100dvh; max-height: 100dvh; }
 
+/* Grouped-card store dots: Bootstrap carousel indicators ship as
+   bars; round them into the little dots the design calls for. */
+.store-dots [data-bs-target] { width: .55rem; height: .55rem; border-radius: 50%; }
+
 :root {
   --bg: #f6f2ea;
   --surface: #fffdf8;

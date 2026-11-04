@@ -58,7 +58,7 @@ section("1. Syntax");
 
 // ---------------------------------------------------------------------------
 section("2. Asset versions");
-const EXPECTED = { ui: 23, styles: 12, app: 11 };
+const EXPECTED = { ui: 24, styles: 13, app: 12 };
 {
   const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
   const uiSrc = readFileSync(join(ROOT, "ui.js"), "utf8");
@@ -101,6 +101,11 @@ section("3b. Quick-view wiring (static)");
   check("index.html has the quick-view modal", indexHtml.includes('id="qv-modal"'));
   check("cards carry a quick-view button", uiSrc.includes("data-qv-url"));
   check("quick view calls the worker /product endpoint", uiSrc.includes("/product?url="));
+  check("group cards use dot indicators, not arrows",
+    uiSrc.includes("carousel-indicators") && uiSrc.includes("data-bs-slide-to") && !uiSrc.includes("Previous store"));
+  check("search form lives inside the sticky nav",
+    indexHtml.indexOf('id="search-form"') > indexHtml.indexOf("<nav") &&
+    indexHtml.indexOf('id="search-form"') < indexHtml.indexOf("</nav>"));
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +180,38 @@ const P = (title, storeId, priceAmount) => ({
     const cands = app.matchCandidates([plain, named], [[plain], [named]]);
     check("candidates: author-suffix pair is offered", cands.length === 1 && cands[0].score === 0.95,
       JSON.stringify(cands.map((c) => c.score)));
+  }
+  {
+    // Packaging and translation dressing must not split a set:
+    // "Psalms" canonicalizes to tehillim, "shrink wrapped" and
+    // "slipcased" are packaging, not editions (Zakkai's screenshots,
+    // 2026-11-03 night).
+    const zb2 = P("Tehillim / Psalms - 2 Volume Set", "zberman", 55);
+    const sd2 = P("Tehillim - Psalms - 2 Vol Shrink Wrapped Set", "seforimdeals", 64.99);
+    check("grouping: Tehillim 2-vol, shrink-wrapped vs plain, groups",
+      sameGroup(groupsOf([zb2, sd2]), zb2, sd2));
+    const zb5 = P("Tehillim - 5 Volume Personal - Size Set", "zberman", 59);
+    const sd5 = P("Tehillim-Psalms - 5 Volume Slipcased Personal Size Set", "seforimdeals", 59.99);
+    check("grouping: Tehillim 5-vol personal-size, slipcased vs plain, groups",
+      sameGroup(groupsOf([zb5, sd5]), zb5, sd5));
+    const deals = P("Living Lessons Pirkei Avos - Hardcover", "seforimdeals", 32.39);
+    const zb = P("Pirkei Avos Living lessons H/C- Yahadus - Weiss Edition", "zberman", 30);
+    const cands = app.matchCandidates([deals, zb], [[deals], [zb]]);
+    check("candidates: Pirkei Avos publisher/editor pair is offered",
+      cands.length === 1 && cands[0].score >= 0.9, JSON.stringify(cands.map((c) => c.score)));
+  }
+  {
+    // The candidate cap: with a crowd of shared-word listings the
+    // subset pair must still be inside the (now 40) sent set.
+    const target1 = P("Sefer Alpha Beta", "seforimdeals", 10);
+    const target2 = P("Sefer Alpha Beta - Plus Dressing Words Here", "zberman", 12);
+    const crowd = [];
+    for (let i = 0; i < 60; i++) crowd.push(P(`Sefer Alpha Gamma ${i}`, i % 2 ? "zberman" : "hamafitz", 20 + i));
+    const entries = [target1, target2, ...crowd];
+    const cands = app.matchCandidates(entries, entries.map((e) => [e]));
+    check("candidates: cap is 40 and the subset pair survives a crowd",
+      cands.length <= 40 && cands.some((c) => (c.a === target1 && c.b === target2) || (c.a === target2 && c.b === target1)),
+      `${cands.length} candidates`);
   }
 
   // Relevance filter.

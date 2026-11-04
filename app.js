@@ -183,7 +183,7 @@ const HEBREW_BRIDGE = [
   ["hilchos", ["הלכות"], "halachos", "halachot", "hilchot", "halacha", "halochos"],
   ["torah", ["תורה"]],
   ["chumash", ["חומש"], "humash"],
-  ["tehillim", ["תהלים"], "tehilim"],
+  ["tehillim", ["תהלים", "תהילים"], "tehilim", "psalms"],
   ["gemara", ["גמרא"], "gemora", "gemorah"],
   ["talmud", ["תלמוד"]],
   ["yerushalmi", ["ירושלמי"]],
@@ -966,6 +966,7 @@ const GROUP_DRESSING = new Set([
   "sefer", "book", "books", "set", "sets", "vol", "vols", "volume", "volumes",
   "כרכים", "סט", "חלק", "חלקים", "chelek", "helek",
   "edition", "editions", "new", "standard", "size", "sized",
+  "shrink", "wrapped", "slipcased", "slipcase", "yahadus",
   "full", "large", "big", "mid", "medium", "compact", "small", "mini", "pocket", "student",
   "גדול", "קטן",
   "leather", "hardcover", "paperback", "softcover", "hard", "hc", "pb",
@@ -1125,6 +1126,12 @@ function matchCandidates(entries, groups) {
       if (!(inter >= 2 || (inter >= 1 && sa.core.length <= 3 && sb.core.length <= 3))) continue;
       const union = new Set([...sa.core, ...sb.core]).size;
       let score = inter / union;
+      // Two listings that agree on the volume count are very likely
+      // the same set wearing different title dressing — ask about
+      // them ahead of the general shared-word crowd. (With a cap of
+      // 16 these pairs were crowded out entirely on big searches:
+      // the 5-volume Tehillim sets never reached the AI at all.)
+      if (sa.count != null && sa.count === sb.count) score = Math.max(score, 0.9);
       // One title fully containing the other — the classic "same
       // book, one store appends the author's name" case ("Healthy
       // Habits" vs "Healthy Habits - Rivka Schonfeld") — is the
@@ -1134,7 +1141,7 @@ function matchCandidates(entries, groups) {
     }
   }
   out.sort((x, y) => y.score - x.score);
-  return out.slice(0, 16);
+  return out.slice(0, 40);
 }
 
 // ---------------------------------------------------------------------------
