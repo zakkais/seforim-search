@@ -58,7 +58,7 @@ section("1. Syntax");
 
 // ---------------------------------------------------------------------------
 section("2. Asset versions");
-const EXPECTED = { ui: 24, styles: 13, app: 12 };
+const EXPECTED = { ui: 25, styles: 13, app: 13 };
 {
   const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
   const uiSrc = readFileSync(join(ROOT, "ui.js"), "utf8");
@@ -103,6 +103,8 @@ section("3b. Quick-view wiring (static)");
   check("quick view calls the worker /product endpoint", uiSrc.includes("/product?url="));
   check("group cards use dot indicators, not arrows",
     uiSrc.includes("carousel-indicators") && uiSrc.includes("data-bs-slide-to") && !uiSrc.includes("Previous store"));
+  check("carousels are instantiated so swipe works without a first tap",
+    uiSrc.includes("bootstrap.Carousel.getOrCreateInstance"));
   check("search form lives inside the sticky nav",
     indexHtml.indexOf('id="search-form"') > indexHtml.indexOf("<nav") &&
     indexHtml.indexOf('id="search-form"') < indexHtml.indexOf("</nav>"));
@@ -194,6 +196,24 @@ const P = (title, storeId, priceAmount) => ({
     const sd5 = P("Tehillim-Psalms - 5 Volume Slipcased Personal Size Set", "seforimdeals", 59.99);
     check("grouping: Tehillim 5-vol personal-size, slipcased vs plain, groups",
       sameGroup(groupsOf([zb5, sd5]), zb5, sd5));
+    // Tehillos Menachem: spelling variants (Tehillas/Tehillos/
+    // תהלות) and the word "perush" must not split the 1-volume
+    // Tehillim — but its 5-volume set must NEVER merge with it.
+    const esichaTm = P("Tehillim – Tehillas Menachem", "esicha", 18);
+    const dealsTm = P("Tehillim With Perush Tehillos Menachem - תהלים עם פירוש תהלות מנחם", "seforimdeals", 22);
+    check("grouping: Tehillim Tehillos Menachem 1-vol groups across spellings",
+      sameGroup(groupsOf([esichaTm, dealsTm]), esichaTm, dealsTm));
+    const zbTm5 = P("Tehillim - Tehillos Menachem - 5 Vol Set", "zberman", 60);
+    check("grouping: the 5-vol Tehillos Menachem set stays apart from the 1-vol",
+      !sameGroup(groupsOf([zbTm5, esichaTm]), zbTm5, esichaTm));
+    // A store listing the identical product twice (slipcase page +
+    // shrink-wrapped page) joins the group as another slide.
+    const zbA = P("Tehillim / Psalms - 2 Volume Set", "zberman", 55);
+    const sdSlip = P("Tehillim - Psalms - 2 Vol. Set", "seforimdeals", 58);
+    const sdShrink = P("Tehillim - Psalms - 2 Vol Shrink Wrapped Set", "seforimdeals", 64.99);
+    const gSame = groupsOf([zbA, sdSlip, sdShrink]);
+    check("grouping: identical same-store duplicate joins the group",
+      gSame.length === 1 && gSame[0].length === 3, JSON.stringify(gSame.map((g) => g.length)));
     const deals = P("Living Lessons Pirkei Avos - Hardcover", "seforimdeals", 32.39);
     const zb = P("Pirkei Avos Living lessons H/C- Yahadus - Weiss Edition", "zberman", 30);
     const cands = app.matchCandidates([deals, zb], [[deals], [zb]]);

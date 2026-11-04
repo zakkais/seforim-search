@@ -25,7 +25,7 @@
 // Searching stays open without signing in, and there is no checkout
 // and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant } from "./app.js?v=12";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant } from "./app.js?v=13";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
@@ -427,6 +427,7 @@ async function openQuickView(url) {
       ? desc.split(/\n+/).filter(Boolean).map((para) => `<p class="mb-2">${esc(para)}</p>`).join("")
       : `<p class="text-secondary small mb-0">${t("noDescription")}</p>`;
     $("#qv-body").innerHTML = html;
+    initCarousels($("#qv-body"));
   } catch {
     if (seq !== qvSeq) return;
     $("#qv-body").innerHTML = `<p class="text-secondary mb-0">${t("detailsError")}</p>`;
@@ -661,6 +662,18 @@ function groupCard(members) {
     </div>`;
 }
 
+// Bootstrap creates a carousel's touch handlers only when the
+// carousel is instantiated — a non-autoplaying carousel has no
+// instance until a control is clicked, so swiping did nothing on a
+// fresh card (the old arrow buttons used to create it as a side
+// effect). Instantiate every rendered carousel up front.
+function initCarousels(root) {
+  if (!window.bootstrap) return;
+  root.querySelectorAll(".carousel").forEach((el) => {
+    window.bootstrap.Carousel.getOrCreateInstance(el);
+  });
+}
+
 function renderResults() {
   // While the wishlist view is open, results stay hidden and untouched.
   if (!$("#wishlist-view").classList.contains("d-none")) return;
@@ -734,6 +747,7 @@ function renderResults() {
     html += `<div class="alert alert-light border text-secondary mt-3" role="note">${t("noListings", { q: esc(activeQuery) })}</div>`;
   }
   section.innerHTML = html;
+  initCarousels(section);
   updateFeedVisibility();
 }
 

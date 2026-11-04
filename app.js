@@ -184,6 +184,7 @@ const HEBREW_BRIDGE = [
   ["torah", ["תורה"]],
   ["chumash", ["חומש"], "humash"],
   ["tehillim", ["תהלים", "תהילים"], "tehilim", "psalms"],
+  ["tehillos", ["תהלות"], "tehillas", "tehilas", "tehilos"],
   ["gemara", ["גמרא"], "gemora", "gemorah"],
   ["talmud", ["תלמוד"]],
   ["yerushalmi", ["ירושלמי"]],
@@ -967,6 +968,7 @@ const GROUP_DRESSING = new Set([
   "כרכים", "סט", "חלק", "חלקים", "chelek", "helek",
   "edition", "editions", "new", "standard", "size", "sized",
   "shrink", "wrapped", "slipcased", "slipcase", "yahadus",
+  "perush", "pirush", "peirush", "פירוש",
   "full", "large", "big", "mid", "medium", "compact", "small", "mini", "pocket", "student",
   "גדול", "קטן",
   "leather", "hardcover", "paperback", "softcover", "hard", "hc", "pb",
@@ -1068,14 +1070,28 @@ function groupProducts(entries) {
   const groups = [];
   const byCore = new Map();
   const strictSame = (a, b) =>
-    a.count === b.count && a.part === b.part && a.sizeClass === b.sizeClass && a.binding === b.binding && a.isSet === b.isSet;
+    a.count === b.count && a.part === b.part && a.sizeClass === b.sizeClass && a.binding === b.binding && a.isSet === b.isSet &&
+    a.editions.join(",") === b.editions.join(",");
+  // A set on one side and a plain (non-set) listing on the other is
+  // the same trap as the part-label case: the plain listing may be a
+  // single volume of the set (Tehillim Tehillos Menachem, 1 vol vs
+  // the 5-vol set). Rules never merge those; the AI check may.
+  const setMismatch = (a, b) =>
+    a.isSet !== b.isSet && !(a.count !== null && b.count !== null);
   for (const idx of order) {
     const sig = sigs[idx];
     let placed = false;
     if (sig.coreKey) {
       for (const gi of byCore.get(sig.coreKey) ?? []) {
         const g = groups[gi];
-        if (g.stores.has(entries[idx].storeId)) continue;
+        // One listing per store per group — EXCEPT a same-store
+        // listing whose signature is exactly identical to every
+        // member's: that is the store listing the same product
+        // twice (SeforimDeals' slipcase and shrink-wrapped pages
+        // for one Tehillim set), and it belongs in the group as
+        // another slide rather than as a duplicate card.
+        if (g.stores.has(entries[idx].storeId) &&
+            !g.members.every((mi) => strictSame(sigs[mi], sig))) continue;
         // A volume/part label stated on one side only is NOT a rule
         // match: the unlabelled listing may be a different volume (a
         // "Living Tehillim" grouped with "Living Tehillim Vol. 4" in
@@ -1083,6 +1099,7 @@ function groupProducts(entries) {
         // — signaturesConflict deliberately does not flag them.
         const fits = g.members.every((mi) =>
           !signaturesConflict(sigs[mi], sig) && (sigs[mi].part || "") === (sig.part || "") &&
+          !setMismatch(sigs[mi], sig) &&
           (sig.core.length > 1 || strictSame(sigs[mi], sig)));
         if (fits) {
           g.members.push(idx);
