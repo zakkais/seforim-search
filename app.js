@@ -746,6 +746,51 @@ function parseForStore(store, text) {
       return [];
   }
 }
+// ---------------------------------------------------------------------------
+// Shipping estimate (the wishlist calculator)
+// ---------------------------------------------------------------------------
+
+export function parsePriceText(text) {
+  if (!text) return null;
+  const m = String(text).replace(/,/g, "").match(/(\d+(?:\.\d{1,2})?)/);
+  return m ? parseFloat(m[1]) : null;
+}
+
+// What can actually be computed from what a store itself publishes.
+// Only SeforimPlace states a usable rule — its product pages badge
+// free shipping on orders above $49. Every other store calculates
+// shipping at checkout, so its shipping stays null: an unknown to
+// show as "calculated at checkout", never a guessed number.
+export const SHIPPING_RULES = {
+  seforimplace: { freeOver: 49 },
+};
+
+export function shippingEstimate(items) {
+  const groups = new Map();
+  for (const i of items ?? []) {
+    const key = i.storeId || i.storeName || "?";
+    if (!groups.has(key)) {
+      groups.set(key, { storeId: i.storeId || null, storeName: i.storeName || "", count: 0, subtotal: 0, unpriced: 0 });
+    }
+    const g = groups.get(key);
+    g.count += 1;
+    const p = typeof i.priceAmount === "number" ? i.priceAmount : parsePriceText(i.priceText);
+    if (p === null) g.unpriced += 1;
+    else g.subtotal += p;
+  }
+  const rows = [...groups.values()].map((g) => {
+    const rule = SHIPPING_RULES[g.storeId] ?? {};
+    const shipping = rule.freeOver != null && g.subtotal >= rule.freeOver ? 0 : null;
+    return { ...g, shipping };
+  });
+  return {
+    rows,
+    subtotal: rows.reduce((s, r) => s + r.subtotal, 0),
+    knownShipping: rows.reduce((s, r) => s + (r.shipping ?? 0), 0),
+    hasUnknown: rows.some((r) => r.shipping === null),
+  };
+}
+
 function targetUrlFor(store, query) {
   if (store.parser === "wooStoreApi") {
     return `https://www.esicha.org/wp-json/wc/store/v1/products?search=${enc(query)}&per_page=${MAX_PER_STORE}`;
