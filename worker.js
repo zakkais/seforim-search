@@ -1351,6 +1351,20 @@ async function handleMatch(request, env, ctx) {
   }
 }
 
+// What each store itself publishes about shipping and tax — the
+// same facts shown in the site's Shipping & tax table, kept in step
+// with it. Stores with no published rate are stated as such; the
+// chatbot must never turn "calculated at checkout" into a number.
+const SHIPPING_FACTS = [
+  "Z. Berman Books: no published shipping rates — UPS or USPS priced by weight and destination; standard delivery is USPS Media Mail (2–8 business days). Tax: not published.",
+  "SeforimDeals: no general rates or free-shipping threshold published; product pages show a per-order delivery estimate; free local delivery options in Crown Heights and Morristown. Tax: not published.",
+  "SeforimPlace (Sossover's): product pages badge \"Free Shipping on orders above $49\"; its delivery page says US/Canada shipping is calculated at checkout by location and weight (UPS Ground / USPS), and Crown Heights local delivery is free over $75, otherwise $5. Tax: not published.",
+  "Hamafitz: no shipping policy published. Tax: not published.",
+  "Greenfield Judaica: no shipping policy published. Tax: not published.",
+  "eSicha: no shipping policy published; some items note they may take up to 45 days to ship. Tax: not published.",
+  "Kehot: product pages reference a free-shipping promotion (large sets excluded) but publish no threshold or general rates. Tax: not published.",
+].join("\n");
+
 async function handleChat(request, env, ctx) {
   const noStore = { "Cache-Control": "no-store" };
   if (request.method !== "POST") return jsonResponse({ error: "POST only" }, 405, request, noStore);
@@ -1430,16 +1444,22 @@ async function handleChat(request, env, ctx) {
   const system = [
     "You are the chat assistant for Seforim Search, a site that searches Jewish bookstores (seforim stores). This is a prototype.",
     "Answer ONLY from the facts provided below: store listings (some with product-page details) and, when present, source excerpts. Never invent a price, a volume count, a publisher, an author, a date, or any other fact.",
+    "Shipping and tax facts, when provided, are what the stores themselves publish. Where a store calculates shipping at checkout, say exactly that — never estimate or invent a shipping charge or a tax amount.",
     "When comparing seforim or explaining the difference between them, use only the details actually stated — title, volumes, size, publisher/vendor, description, price, stock — and say which relevant details are not stated.",
     "When you use a listing, name its store. When you use a source excerpt, name the sefer and section it comes from and include its link.",
     "If the provided facts do not answer the question, say plainly what you could not verify instead of guessing.",
     "Keep answers focused: usually two to five sentences, or a short list when comparing. Answer in the language the question was asked in.",
     "Prices are the stores' current listing prices and can change; say so when an answer turns on a price.",
   ].join(" ");
+  // Shipping/tax questions get the stores' own published policies
+  // as facts (the same data the site's Shipping & tax table shows).
+  const shipFacts = /ship|deliver|postage|freight|tax|משלוח|מס/i.test(question)
+    ? `\n\nShipping and tax facts (what each store itself publishes):\n${SHIPPING_FACTS}`
+    : "";
   const listingsPart = `Question: ${question}\n\nListings found${terms ? ` for "${terms}"` : ""}:\n`;
   const userMsg = listingsPart + (contextLines.length ? contextLines.join("\n") : "(none)") +
-    (sourceLines.length ? `\n\nSource excerpts:\n${sourceLines.join("\n")}` : "");
-  const plainMsg = listingsPart + (plainLines.length ? plainLines.join("\n") : "(none)");
+    (sourceLines.length ? `\n\nSource excerpts:\n${sourceLines.join("\n")}` : "") + shipFacts;
+  const plainMsg = listingsPart + (plainLines.length ? plainLines.join("\n") : "(none)") + shipFacts;
   // Workers AI answers in one of two shapes depending on the model:
   // the classic { response } or an OpenAI-style chat completion
   // ({ choices: [{ message: { content } }] }). Read both.

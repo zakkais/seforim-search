@@ -25,7 +25,7 @@
 // Searching stays open without signing in, and there is no checkout
 // and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant } from "./app.js?v=14";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant, shippingEstimate } from "./app.js?v=15";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
@@ -66,7 +66,7 @@ const I18N = {
     quickView: "Quick view", visitStore: "View at store", loadingDetails: "Loading details…", detailsError: "Couldn’t load the details — they’re on the store’s page.", noDescription: "No description available from the store.",
     scan: "Scan ISBN", scanTitle: "Scan an ISBN or QR code", scanHint: "Point the camera at the barcode on the back of the sefer.", scanUnsupported: "Scanning is not supported in this browser — type the ISBN into the search box instead.", cancel: "Cancel",
     chatTitle: "Ask about a sefer", chatNote: "Prototype — it answers from the stores' listings and product pages, and checks ChabadLibrary when a question names a sefer in Hebrew. What it can't verify, it says so.", chatPlaceholder: "Ask about a sefer…", chatSend: "Send", backToTop: "Back to top", chatWelcome: "Shalom! Ask me about a sefer — for example, which store has it cheapest, or whether it's sold out anywhere.", chatThinking: "Checking the stores…", chatError: "The chat couldn't answer just now — please try again.",
-    newReleases: "New & just in", shippingTax: "Shipping & tax", shipNote: "What each store itself publishes about its shipping and tax. Where a store publishes no rate, only its own checkout has the real number — this page doesn't guess.",
+    newReleases: "New & just in", shippingTax: "Shipping & tax", shipNote: "What each store itself publishes about its shipping and tax. Where a store publishes no rate, only its own checkout has the real number — this page doesn't guess.", shipEstimate: "Shipping estimate", shipItems: "Items", shipColSubtotal: "Subtotal", shipColShipping: "Shipping", shipFree: "Free", shipAtCheckout: "Calculated at checkout", shipTotal: "Total", shipTotalNote: "Excludes shipping for stores that calculate it at checkout.",
     resultsFor: "Results for “{q}”", listingsLoadedOne: "1 listing loaded", listingsLoadedOther: "{n} listings loaded",
     alsoSearchedFor: "Also searched for: ", searching: "Searching {stores}…",
     noListings: "No listings matched “{q}” at the included stores.",
@@ -94,7 +94,7 @@ const I18N = {
     quickView: "מבט מהיר", visitStore: "לצפייה בחנות", loadingDetails: "טוען פרטים…", detailsError: "לא ניתן לטעון את הפרטים — הם מופיעים בדף החנות.", noDescription: "אין תיאור זמין מהחנות.",
     scan: "סריקת ISBN", scanTitle: "סריקת ISBN או קוד QR", scanHint: "כוונו את המצלמה אל הברקוד שבגב הספר.", scanUnsupported: "הסריקה אינה נתמכת בדפדפן זה — הקלידו את ה-ISBN בתיבת החיפוש.", cancel: "ביטול",
     chatTitle: "שאל על ספר", chatNote: "אב־טיפוס — עונה ממודעות החנויות ומדפי המוצר, ובשאלה שמזכירה ספר בעברית בודק גם ב-ChabadLibrary. מה שאינו יכול לאמת — הוא אומר זאת.", chatPlaceholder: "שאל על ספר…", chatSend: "שלח", backToTop: "חזרה למעלה", chatWelcome: "שלום! שאל אותי על ספר — למשל, באיזו חנות הוא הכי זול, או אם הוא אזל באיזו חנות.", chatThinking: "בודק בחנויות…", chatError: "הצ׳אט לא הצליח לענות כרגע — נסה שוב.",
-    newReleases: "חדש והגיע", shippingTax: "משלוח ומס", shipNote: "מה שכל חנות מפרסמת בעצמה על המשלוח והמס שלה. חנות שלא מפרסמת מחיר — רק בקופה שלה יש את המספר האמיתי; העמוד הזה לא מנחש.",
+    newReleases: "חדש והגיע", shippingTax: "משלוח ומס", shipNote: "מה שכל חנות מפרסמת בעצמה על המשלוח והמס שלה. חנות שלא מפרסמת מחיר — רק בקופה שלה יש את המספר האמיתי; העמוד הזה לא מנחש.", shipEstimate: "הערכת משלוח", shipItems: "פריטים", shipColSubtotal: "סכום ביניים", shipColShipping: "משלוח", shipFree: "חינם", shipAtCheckout: "מחושב בקופה", shipTotal: "סה\"כ", shipTotalNote: "לא כולל משלוח לחנויות שמחשבות אותו בקופה.",
     resultsFor: "תוצאות עבור “{q}”", listingsLoadedOne: "מודעה אחת נטענה", listingsLoadedOther: "{n} מודעות נטענו",
     alsoSearchedFor: "חיפשנו גם: ", searching: "מחפש ב־{stores}…",
     noListings: "לא נמצאו מודעות עבור “{q}” בחנויות הכלולות.",
@@ -122,7 +122,7 @@ const I18N = {
     quickView: "שנעלער בליק", visitStore: "זען אין קראָם", loadingDetails: "לאָדט דעטאַלן…", detailsError: "די דעטאַלן האָבן זיך ניט געלאָדט — זיי זענען אויפֿן קראָם־בלאַט.", noDescription: "קיין באַשרײַבונג פֿון דער קראָם.",
     scan: "סקענען ISBN", scanTitle: "סקענען אַן ISBN אָדער QR קאָד", scanHint: "ווײַזט די קאַמעראַ אויפֿן באַרקאָד אויפֿן רוקן פֿונעם ספֿר.", scanUnsupported: "סקענען ווערט נישט געשטיצט אין דעם בלעטערער — טיפּט דעם ISBN אין דער זוך־קעסטל.", cancel: "אָפּזאָגן",
     chatTitle: "פֿרעגט וועגן אַ ספר", chatNote: "פּראָטאָטיפּ — ענטפֿערט פֿון די ליסטינגס און פּראָדוקט־בלעטער פֿון די קראָמען, און קוקט אין ChabadLibrary ווען די פֿראַגע רופט אַ ספר אויף העברעיִש. וואָס עס קען נישט באַשטעטיקן, זאָגט עס.", chatPlaceholder: "פֿרעגט וועגן אַ ספר…", chatSend: "שיקן", backToTop: "צוריק אַרויף", chatWelcome: "שלום! פֿרעגט מיך וועגן אַ ספר — למשל, אין וועלכער קראָם איז עס די ביליקסטע, אָדער צי עס איז ערגעץ אויספאַרקויפט.", chatThinking: "קוקט אין די קראָמען…", chatError: "דער טשאַט האָט איצט נישט געקענט ענטפֿערן — פּרוּווט נאָך אַ מאָל.",
-    newReleases: "נײַ און פֿריש אָנגעקומען", shippingTax: "שיפּינג און שטײַער", shipNote: "וואָס יעדער קראָם גיט אַליין אָן וועגן זײַן שיפּינג און שטײַער. אַ קראָם וואָס גיט נישט אָן קיין פּרײַז — נאָר בײַם קאַסע איז דאָ דער עכטער נומער; דער בלאַט טרעפֿט נישט.",
+    newReleases: "נײַ און פֿריש אָנגעקומען", shippingTax: "שיפּינג און שטײַער", shipNote: "וואָס יעדער קראָם גיט אַליין אָן וועגן זײַן שיפּינג און שטײַער. אַ קראָם וואָס גיט נישט אָן קיין פּרײַז — נאָר בײַם קאַסע איז דאָ דער עכטער נומער; דער בלאַט טרעפֿט נישט.", shipEstimate: "שיפּינג־אפשאַצונג", shipItems: "שטיק", shipColSubtotal: "צוויישן־סכום", shipColShipping: "שיפּינג", shipFree: "פֿרײַ", shipAtCheckout: "ווערט אויסגערעכנט בײַם קאַסע", shipTotal: "סך־הכּל", shipTotalNote: "אָן שיפּינג פֿאַר קראָמען וואָס רעכענען אים בײַם קאַסע.",
     resultsFor: "רעזולטאַטן פֿאַר “{q}”", listingsLoadedOne: "1 ליסטינג געלאַדן", listingsLoadedOther: "{n} ליסטינגס געלאַדן",
     alsoSearchedFor: "אויך געזוכט: ", searching: "זוכן אין {stores}…",
     noListings: "קיין ליסטינגס האָבן נישט געפּאַסט “{q}” אין די אַרײַנגענומענע קראָמען.",
@@ -150,7 +150,7 @@ const I18N = {
     quickView: "Vista rápida", visitStore: "Ver en la tienda", loadingDetails: "Cargando detalles…", detailsError: "No se pudieron cargar los detalles; están en la página de la tienda.", noDescription: "La tienda no ofrece descripción.",
     scan: "Escanear ISBN", scanTitle: "Escanea un ISBN o código QR", scanHint: "Apunta la cámara al código de barras en la parte trasera del libro.", scanUnsupported: "El escaneo no es compatible con este navegador: escribe el ISBN en el cuadro de búsqueda.", cancel: "Cancelar",
     chatTitle: "Pregunta por un séfer", chatNote: "Prototipo: responde desde los listados y las páginas de producto de las tiendas, y consulta ChabadLibrary cuando una pregunta nombra un séfer en hebreo. Lo que no puede verificar, lo dice.", chatPlaceholder: "Pregunta por un séfer…", chatSend: "Enviar", backToTop: "Volver arriba", chatWelcome: "¡Shalom! Pregúntame por un séfer: por ejemplo, en qué tienda está más barato o si está agotado en alguna.", chatThinking: "Revisando las tiendas…", chatError: "El chat no pudo responder ahora. Inténtalo de nuevo.",
-    newReleases: "Novedades", shippingTax: "Envío e impuestos", shipNote: "Lo que cada tienda publica sobre sus envíos e impuestos. Si una tienda no publica tarifas, solo su caja tiene el número real: esta página no lo inventa.",
+    newReleases: "Novedades", shippingTax: "Envío e impuestos", shipNote: "Lo que cada tienda publica sobre sus envíos e impuestos. Si una tienda no publica tarifas, solo su caja tiene el número real: esta página no lo inventa.", shipEstimate: "Estimación de envío", shipItems: "Artículos", shipColSubtotal: "Subtotal", shipColShipping: "Envío", shipFree: "Gratis", shipAtCheckout: "Se calcula al pagar", shipTotal: "Total", shipTotalNote: "Excluye el envío de las tiendas que lo calculan al pagar.",
     resultsFor: "Resultados para “{q}”", listingsLoadedOne: "1 anuncio cargado", listingsLoadedOther: "{n} anuncios cargados",
     alsoSearchedFor: "También se buscó: ", searching: "Buscando en {stores}…",
     noListings: "Ningún anuncio coincidió con “{q}” en las tiendas incluidas.",
@@ -178,7 +178,7 @@ const I18N = {
     quickView: "Aperçu rapide", visitStore: "Voir en boutique", loadingDetails: "Chargement des détails…", detailsError: "Impossible de charger les détails — ils sont sur la page de la boutique.", noDescription: "Aucune description de la boutique.",
     scan: "Scanner l'ISBN", scanTitle: "Scanner un ISBN ou un code QR", scanHint: "Pointez l'appareil photo vers le code-barres au dos du livre.", scanUnsupported: "La numérisation n'est pas prise en charge dans ce navigateur — saisissez l'ISBN dans la zone de recherche.", cancel: "Annuler",
     chatTitle: "Demander un séfer", chatNote: "Prototype : répond à partir des listes et des pages produits des boutiques, et consulte ChabadLibrary quand une question nomme un séfer en hébreu. Ce qu'il ne peut pas vérifier, il le dit.", chatPlaceholder: "Demandez un séfer…", chatSend: "Envoyer", backToTop: "Retour en haut", chatWelcome: "Shalom ! Demandez-moi un séfer — par exemple, dans quelle boutique il est le moins cher, ou s'il est épuisé quelque part.", chatThinking: "Vérification des boutiques…", chatError: "Le chat n'a pas pu répondre. Réessayez.",
-    newReleases: "Nouveautés", shippingTax: "Expédition et taxes", shipNote: "Ce que chaque boutique publie elle-même sur son expédition et ses taxes. Si une boutique ne publie aucun tarif, seule sa caisse donne le vrai montant — cette page ne devine pas.",
+    newReleases: "Nouveautés", shippingTax: "Expédition et taxes", shipNote: "Ce que chaque boutique publie elle-même sur son expédition et ses taxes. Si une boutique ne publie aucun tarif, seule sa caisse donne le vrai montant — cette page ne devine pas.", shipEstimate: "Estimation d'expédition", shipItems: "Articles", shipColSubtotal: "Sous-total", shipColShipping: "Expédition", shipFree: "Gratuit", shipAtCheckout: "Calculé à la caisse", shipTotal: "Total", shipTotalNote: "Exclut l'expédition des boutiques qui la calculent à la caisse.",
     resultsFor: "Résultats pour « {q} »", listingsLoadedOne: "1 annonce chargée", listingsLoadedOther: "{n} annonces chargées",
     alsoSearchedFor: "Aussi recherché : ", searching: "Recherche dans {stores}…",
     noListings: "Aucune annonce ne correspond à « {q} » dans les boutiques incluses.",
@@ -837,6 +837,49 @@ async function refreshAuth() {
   initGoogleSignIn();
 }
 
+// The wishlist shipping calculator: per-store subtotals from the
+// saved listings, with a shipping figure only where the store
+// itself publishes a rule — everywhere else it says "calculated
+// at checkout" rather than inventing a number.
+function shipPanelHtml() {
+  const est = shippingEstimate(wishlist.items);
+  if (!est.rows.length) return "";
+  const money = (n) => `$${n.toFixed(2)}`;
+  const body = est.rows.map((r) => `
+    <tr>
+      <td>${esc(r.storeName || r.storeId || "")}</td>
+      <td class="text-end">${r.count}</td>
+      <td class="text-end">${money(r.subtotal)}</td>
+      <td class="text-end">${r.shipping === 0 ? t("shipFree") : r.shipping != null ? money(r.shipping) : t("shipAtCheckout")}</td>
+    </tr>`).join("");
+  const grand = est.subtotal + est.knownShipping;
+  return `
+  <div class="card mt-3">
+    <div class="card-body">
+      <h3 class="h6 font-display mb-2">${t("shipEstimate")}</h3>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-2">
+          <thead><tr>
+            <th scope="col">Store</th>
+            <th scope="col" class="text-end">${t("shipItems")}</th>
+            <th scope="col" class="text-end">${t("shipColSubtotal")}</th>
+            <th scope="col" class="text-end">${t("shipColShipping")}</th>
+          </tr></thead>
+          <tbody>${body}</tbody>
+          <tfoot><tr>
+            <th scope="row">${t("shipTotal")}</th>
+            <td></td>
+            <th class="text-end">${money(est.subtotal)}</th>
+            <th class="text-end">${est.knownShipping ? money(est.knownShipping) : "—"}</th>
+          </tr></tfoot>
+        </table>
+      </div>
+      <p class="fw-bold mb-0">${t("shipTotal")}: ${money(grand)}</p>
+      ${est.hasUnknown ? `<p class="text-secondary small mb-0">${t("shipTotalNote")}</p>` : ""}
+    </div>
+  </div>`;
+}
+
 function renderWishlist() {
   const titlesWrap = $("#wish-titles");
   const itemsWrap = $("#wish-items");
@@ -854,7 +897,7 @@ function renderWishlist() {
       productByUrl.set(i.url, { product: i, store });
       return productCard(store, i, "remove");
     }).join("");
-    itemsWrap.innerHTML = `<p class="text-secondary small mb-2">${t("savedListings")}</p><div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">${cards}</div>`;
+    itemsWrap.innerHTML = `<p class="text-secondary small mb-2">${t("savedListings")}</p><div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">${cards}</div>` + shipPanelHtml();
   } else {
     itemsWrap.innerHTML = wishlist.titles.length
       ? ""

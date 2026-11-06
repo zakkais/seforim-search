@@ -58,7 +58,7 @@ section("1. Syntax");
 
 // ---------------------------------------------------------------------------
 section("2. Asset versions");
-const EXPECTED = { ui: 26, styles: 13, app: 14 };
+const EXPECTED = { ui: 27, styles: 13, app: 15 };
 {
   const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
   const uiSrc = readFileSync(join(ROOT, "ui.js"), "utf8");
@@ -105,6 +105,11 @@ section("3b. Quick-view wiring (static)");
     uiSrc.includes("carousel-indicators") && uiSrc.includes("data-bs-slide-to") && !uiSrc.includes("Previous store"));
   check("carousels are instantiated so swipe works without a first tap",
     uiSrc.includes("bootstrap.Carousel.getOrCreateInstance"));
+  const workerSrc = readFileSync(join(ROOT, "worker.js"), "utf8");
+  check("chatbot carries the published shipping/tax facts",
+    workerSrc.includes("SHIPPING_FACTS") && workerSrc.includes("Free Shipping on orders above $49"));
+  check("wishlist renders the shipping calculator",
+    uiSrc.includes("shippingEstimate") && uiSrc.includes("shipPanelHtml"));
   check("search form lives inside the sticky nav",
     indexHtml.indexOf('id="search-form"') > indexHtml.indexOf("<nav") &&
     indexHtml.indexOf('id="search-form"') < indexHtml.indexOf("</nav>"));
@@ -228,6 +233,23 @@ const P = (title, storeId, priceAmount) => ({
     const ploniB = P("Sefer Ploni", "seforimdeals", 52);
     check("grouping: identical titles at ordinary prices group",
       sameGroup(groupsOf([ploniA, ploniB]), ploniA, ploniB));
+    // Shipping calculator: only published rules produce a number.
+    const est1 = app.shippingEstimate([
+      { storeId: "seforimplace", storeName: "SeforimPlace", priceText: "$30.00" },
+      { storeId: "seforimplace", storeName: "SeforimPlace", priceText: "$25.00" },
+      { storeId: "zberman", storeName: "Z. Berman Books", priceText: "$1,276.21" },
+    ]);
+    const spRow = est1.rows.find((r) => r.storeId === "seforimplace");
+    const zbRow = est1.rows.find((r) => r.storeId === "zberman");
+    check("shipping: SeforimPlace is free at/over its published $49",
+      spRow.subtotal === 55 && spRow.shipping === 0);
+    check("shipping: a store with no published rate stays checkout-calculated",
+      zbRow.shipping === null && est1.hasUnknown === true && zbRow.subtotal === 1276.21);
+    const est2 = app.shippingEstimate([{ storeId: "seforimplace", storeName: "SeforimPlace", priceText: "$20.00" }]);
+    check("shipping: SeforimPlace under $49 is checkout-calculated, not guessed",
+      est2.rows[0].shipping === null);
+    check("shipping: price text parses with commas and cents",
+      app.parsePriceText("$1,276.21") === 1276.21 && app.parsePriceText("") === null);
     // A store listing the identical product twice (slipcase page +
     // shrink-wrapped page) joins the group as another slide.
     const zbA = P("Tehillim / Psalms - 2 Volume Set", "zberman", 55);
