@@ -108,6 +108,14 @@ section("3b. Quick-view wiring (static)");
   check("search form lives inside the sticky nav",
     indexHtml.indexOf('id="search-form"') > indexHtml.indexOf("<nav") &&
     indexHtml.indexOf('id="search-form"') < indexHtml.indexOf("</nav>"));
+  // The static first-paint label must agree with the real store
+  // list — it once sat at "8 of 8" long after two stores were
+  // removed (spotted by an outside review, 2026-11-06).
+  const appSrc = readFileSync(join(ROOT, "app.js"), "utf8");
+  const storeCount = (appSrc.match(/^\s+id: "/gm) || []).length;
+  check("stores counter label matches the configured store count",
+    indexHtml.includes(`Stores · ${storeCount} of ${storeCount} included`),
+    `label should say ${storeCount} of ${storeCount}`);
 }
 
 // ---------------------------------------------------------------------------
