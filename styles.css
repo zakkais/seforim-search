@@ -39,6 +39,11 @@
 }
 
 @media (prefers-color-scheme: dark) {
+  /* Bootstrap's close icon is a dark glyph meant for light
+     surfaces; on this site's dark scheme it all but disappears
+     (the quick-view modal seemed to have no exit). Invert it,
+     the same treatment Bootstrap itself uses in its dark theme. */
+  .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
   :root {
     --bg: #161310;
     --surface: #211d17;

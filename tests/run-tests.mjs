@@ -58,7 +58,7 @@ section("1. Syntax");
 
 // ---------------------------------------------------------------------------
 section("2. Asset versions");
-const EXPECTED = { ui: 27, styles: 13, app: 15 };
+const EXPECTED = { ui: 28, styles: 14, app: 15 };
 {
   const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
   const uiSrc = readFileSync(join(ROOT, "ui.js"), "utf8");
@@ -110,6 +110,15 @@ section("3b. Quick-view wiring (static)");
     workerSrc.includes("SHIPPING_FACTS") && workerSrc.includes("Free Shipping on orders above $49"));
   check("wishlist renders the shipping calculator",
     uiSrc.includes("shippingEstimate") && uiSrc.includes("shipPanelHtml"));
+  // The quick view needs an exit you can actually see on a phone in
+  // dark mode: a labelled Close button in its footer, and the
+  // header X inverted so it shows on the dark scheme.
+  const qvFooter = indexHtml.slice(indexHtml.indexOf('id="qv-modal"'));
+  check("quick view has a labelled Close button",
+    qvFooter.includes('data-bs-dismiss="modal"') && qvFooter.includes('data-i18n="closeBtn"'));
+  const stylesSrc = readFileSync(join(ROOT, "styles.css"), "utf8");
+  check("close icon stays visible in the dark scheme",
+    stylesSrc.includes(".btn-close") && stylesSrc.includes("invert(1)"));
   check("search form lives inside the sticky nav",
     indexHtml.indexOf('id="search-form"') > indexHtml.indexOf("<nav") &&
     indexHtml.indexOf('id="search-form"') < indexHtml.indexOf("</nav>"));
