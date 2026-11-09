@@ -58,7 +58,7 @@ section("1. Syntax");
 
 // ---------------------------------------------------------------------------
 section("2. Asset versions");
-const EXPECTED = { ui: 28, styles: 14, app: 15 };
+const EXPECTED = { ui: 29, styles: 14, app: 16 };
 {
   const indexHtml = readFileSync(join(ROOT, "index.html"), "utf8");
   const uiSrc = readFileSync(join(ROOT, "ui.js"), "utf8");
@@ -108,6 +108,11 @@ section("3b. Quick-view wiring (static)");
   const workerSrc = readFileSync(join(ROOT, "worker.js"), "utf8");
   check("chatbot carries the published shipping/tax facts",
     workerSrc.includes("SHIPPING_FACTS") && workerSrc.includes("Free Shipping on orders above $49"));
+  check("MySefer is in both store lists with its Dawn parser",
+    workerSrc.includes('id: "mysefer"') &&
+    readFileSync(join(ROOT, "app.js"), "utf8").includes('id: "mysefer"') &&
+    workerSrc.includes("parseShopifyDawn") &&
+    readFileSync(join(ROOT, "app.js"), "utf8").includes("parseShopifyDawn"));
   check("wishlist renders the shipping calculator",
     uiSrc.includes("shippingEstimate") && uiSrc.includes("shipPanelHtml"));
   // The quick view needs an exit you can actually see on a phone in
@@ -399,7 +404,7 @@ section("5. Worker with stubbed stores");
 if (LIVE) {
   section("6. Live smoke (deployed worker, real data)");
   const W = "https://seforim-search.zakkaishusterman01.workers.dev";
-  const STORE_IDS = ["zberman", "seforimdeals", "seforimplace", "hamafitz", "greenfield", "esicha"];
+  const STORE_IDS = ["zberman", "seforimdeals", "mysefer", "seforimplace", "hamafitz", "greenfield", "esicha"];
   const mergedFor = async (q) => {
     const byUrl = new Map();
     for (const variant of app.expandQuery(q)) {
@@ -417,7 +422,7 @@ if (LIVE) {
   };
   const me = await mergedFor("minchas elazar");
   const kept = app.filterRelevant(me, "minchas elazar");
-  check("live: minchas elazar is filtered to a focused set", kept.length >= 1 && kept.length <= 8,
+  check("live: minchas elazar is filtered to a focused set", kept.length >= 1 && kept.length <= 10,
     `${me.length} merged -> ${kept.length} kept`);
   check("live: the Oz Vehadar Shut survives the filter",
     kept.some((p) => String(p.title).includes("מנחת אלעזר")));
@@ -425,6 +430,10 @@ if (LIVE) {
   const tGroups = app.groupProducts(tanya);
   check("live: Living Lessons Tanya groups across stores",
     tGroups.some((g) => g.length >= 2 && g.some((p) => /Living Lessons/i.test(p.title))));
+  const ms = tanya.filter((p) => p.storeId === "mysefer");
+  check("live: MySefer returns real listings with its own URLs",
+    ms.length >= 3 && ms.every((p) => p.url.startsWith("https://mysefer.com/products/")),
+    `${ms.length} MySefer listings in the tanya merge`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
