@@ -67,6 +67,8 @@ const STORES = [
     searchUrl: (q) => `https://zbermanbooks.com/catalogsearch/result/?q=${enc(q)}` },
   { id: "seforimdeals", name: "SeforimDeals", parser: "shopify",
     searchUrl: (q) => `https://seforimdeals.com/search?q=${enc(q)}` },
+  { id: "mysefer", name: "MySefer", parser: "shopifyDawn",
+    searchUrl: (q) => `https://mysefer.com/search?q=${enc(q)}` },
   { id: "seforimplace", name: "SeforimPlace", parser: "opencartJournal",
     searchUrl: (q) => `https://seforimplace.com/index.php?route=product/search&search=${enc(q)}` },
   { id: "hamafitz", name: "Hamafitz", parser: "opencartClassic",
@@ -219,18 +221,60 @@ function parseShopify(html) {
   }
   return products;
 }
-function parseShopifySuggest(raw) {
+function parseShopifySuggest(raw, origin) {
   try {
     const data = JSON.parse(raw);
     const list = data.resources?.results?.products ?? [];
     return list.slice(0, MAX_PER_STORE).map((p) => {
       const img = p.featured_image?.url ?? p.featured_image?.src ?? null;
       const priceN = p.price ? parseFloat(p.price) : NaN;
-      return { title: cleanText(p.title ?? ""), url: p.url ? `https://seforimdeals.com${p.url.split("?")[0]}` : "",
+      return { title: cleanText(p.title ?? ""), url: p.url ? `${origin}${p.url.split("?")[0]}` : "",
         priceText: Number.isFinite(priceN) ? money(priceN) : null, priceAmount: Number.isFinite(priceN) ? priceN : null,
         compareAtText: null, imageUrl: img ? (img.startsWith("//") ? `https:${img}` : img) : null };
     }).filter((p) => p.title && p.url);
   } catch { return []; }
+}
+
+// Shopify's Dawn theme (MySefer, added 2026-11-08 at Zakkai's
+// request after its robots.txt checked out — public storefront
+// HTML is crawlable and /search is not disallowed): product cards
+// are .product-card-wrapper blocks, the title link carries
+// class "full-unstyled-link", prices sit in .price__regular /
+// .price__sale spans, and a sold-out card's price block carries
+// the price--sold-out class (or a "Sold out" badge).
+function parseShopifyDawn(html, origin) {
+  const products = []; const seen = new Set();
+  const blocks = html.split(/<div class="card-wrapper product-card-wrapper/);
+  for (const block of blocks.slice(1)) {
+    if (products.length >= MAX_PER_STORE) break;
+    const chunk = block.slice(0, 9000);
+    const linkM = chunk.match(/<a\s+href="(\/products\/[^"]+)"[^>]*class="full-unstyled-link"[^>]*>([\s\S]*?)<\/a>/);
+    if (!linkM) continue;
+    const handle = linkM[1].split("?")[0].split("/products/")[1];
+    if (!handle) continue;
+    const url = `${origin}/products/${handle}`;
+    if (seen.has(url)) continue;
+    const title = cleanText(linkM[2]);
+    if (!title) continue;
+    seen.add(url);
+    let imageUrl = null;
+    const imgM = chunk.match(/<img\b[^>]*\bsrc="([^"]+)"/);
+    if (imgM) imageUrl = imgM[1].startsWith("//") ? `https:${imgM[1]}` : imgM[1];
+    const saleM = chunk.match(/price-item--sale[^>]*>\s*\$?\s*([\d,]+(?:\.\d{2})?)/);
+    const cmpM = chunk.match(/<s class="price-item[^"]*"[^>]*>\s*\$?\s*([\d,]+(?:\.\d{2})?)/);
+    let priceAmount = null;
+    if (saleM) priceAmount = parseFloat(saleM[1].replace(/,/g, ""));
+    if (priceAmount == null || !Number.isFinite(priceAmount)) {
+      const regM = chunk.match(/price__regular[\s\S]{0,500}?price-item--regular[^>]*>\s*\$?\s*([\d,]+(?:\.\d{2})?)/);
+      if (regM) priceAmount = parseFloat(regM[1].replace(/,/g, ""));
+    }
+    const compareAmount = cmpM ? parseFloat(cmpM[1].replace(/,/g, "")) : null;
+    const soldOut = /price--sold-out/.test(chunk) || /badge[^>]*>\s*Sold out\s*</.test(chunk);
+    products.push({ title, url, priceText: priceAmount == null ? null : money(priceAmount), priceAmount,
+      compareAtText: compareAmount != null && Number.isFinite(compareAmount) && compareAmount !== priceAmount ? money(compareAmount) : null,
+      imageUrl, ...(soldOut ? { soldOut: true } : {}) });
+  }
+  return products;
 }
 function parseOpencartJournal(html) {
   const clean = html.replace(/<style[\s\S]*?<\/style>/g, "").replace(/<script[\s\S]*?<\/script>/g, "");
@@ -345,6 +389,7 @@ function parseForStore(store, text) {
   switch (store.parser) {
     case "magento": return parseMagento(text);
     case "shopify": return parseShopify(text);
+    case "shopifyDawn": return parseShopifyDawn(text, new URL(store.searchUrl("x")).origin);
     case "opencartJournal": return parseOpencartJournal(text);
     case "opencartClassic": return parseOpencartClassic(text);
     case "volusion": return parseVolusion(text);
@@ -490,11 +535,12 @@ async function searchStoreWorker(store, query, env, ctx, opts = {}) {
     }));
     products = mergeAcrossPages([products, ...pages]);
   }
-  if (products.length === 0 && store.parser === "shopify") {
-    const suggestUrl = `https://seforimdeals.com/search/suggest.json?q=${enc(query)}&resources%5Btype%5D=product&resources%5Blimit%5D=10`;
+  if (products.length === 0 && (store.parser === "shopify" || store.parser === "shopifyDawn")) {
+    const origin = new URL(store.searchUrl("x")).origin;
+    const suggestUrl = `${origin}/search/suggest.json?q=${enc(query)}&resources%5Btype%5D=product&resources%5Blimit%5D=10`;
     try {
       const res = await fetch(suggestUrl, { headers: { "User-Agent": UA } });
-      if (res.ok) products = parseShopifySuggest(await res.text());
+      if (res.ok) products = parseShopifySuggest(await res.text(), origin);
     } catch { /* keep empty */ }
   }
   if (!light && store.id === "seforimdeals" && env && products.length > 0) {
@@ -1045,6 +1091,7 @@ async function fetchTextTimeout(url, ms) {
 const PRODUCT_HOSTS = new Set([
   "zbermanbooks.com", "www.zbermanbooks.com",
   "seforimdeals.com", "www.seforimdeals.com",
+  "mysefer.com", "www.mysefer.com",
   "seforimplace.com", "www.seforimplace.com",
   "hamafitz.com", "www.hamafitz.com",
   "greenfieldjudaica.com", "www.greenfieldjudaica.com",
@@ -1358,6 +1405,7 @@ async function handleMatch(request, env, ctx) {
 const SHIPPING_FACTS = [
   "Z. Berman Books: no published shipping rates — UPS or USPS priced by weight and destination; standard delivery is USPS Media Mail (2–8 business days). Tax: not published.",
   "SeforimDeals: no general rates or free-shipping threshold published; product pages show a per-order delivery estimate; free local delivery options in Crown Heights and Morristown. Tax: not published.",
+  "MySefer: no flat rates or free-shipping threshold published; shipping is a live UPS quote by weight, shown before payment — US (48 states) and Canada by UPS, Alaska/Hawaii and other countries by US Mail. Tax: not published.",
   "SeforimPlace (Sossover's): product pages badge \"Free Shipping on orders above $49\"; its delivery page says US/Canada shipping is calculated at checkout by location and weight (UPS Ground / USPS), and Crown Heights local delivery is free over $75, otherwise $5. Tax: not published.",
   "Hamafitz: no shipping policy published. Tax: not published.",
   "Greenfield Judaica: no shipping policy published. Tax: not published.",

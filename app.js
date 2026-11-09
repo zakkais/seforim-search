@@ -46,6 +46,12 @@ var STORES = [
     searchUrl: (q) => `https://seforimdeals.com/search?q=${enc(q)}`
   },
   {
+    id: "mysefer",
+    name: "MySefer",
+    parser: "shopifyDawn",
+    searchUrl: (q) => `https://mysefer.com/search?q=${enc(q)}`
+  },
+  {
     id: "seforimplace",
     name: "SeforimPlace",
     parser: "opencartJournal",
@@ -491,7 +497,7 @@ function parseShopify(html) {
   }
   return products;
 }
-function parseShopifySuggest(raw) {
+function parseShopifySuggest(raw, origin) {
   try {
     const data = JSON.parse(raw);
     const list = data.resources?.results?.products ?? [];
@@ -500,7 +506,7 @@ function parseShopifySuggest(raw) {
       const priceN = p.price ? parseFloat(p.price) : NaN;
       return {
         title: cleanText(p.title ?? ""),
-        url: p.url ? `https://seforimdeals.com${p.url.split("?")[0]}` : "",
+        url: p.url ? `${origin}${p.url.split("?")[0]}` : "",
         priceText: Number.isFinite(priceN) ? money(priceN) : null,
         priceAmount: Number.isFinite(priceN) ? priceN : null,
         compareAtText: null,
@@ -510,6 +516,55 @@ function parseShopifySuggest(raw) {
   } catch {
     return [];
   }
+}
+
+// Shopify's Dawn theme (MySefer, added 2026-11-08 at Zakkai's
+// request after its robots.txt checked out — public storefront
+// HTML is crawlable and /search is not disallowed): product cards
+// are .product-card-wrapper blocks, the title link carries
+// class "full-unstyled-link", prices sit in .price__regular /
+// .price__sale spans, and a sold-out card's price block carries
+// the price--sold-out class (or a "Sold out" badge).
+function parseShopifyDawn(html, origin) {
+  const products = [];
+  const seen = new Set();
+  const blocks = html.split(/<div class="card-wrapper product-card-wrapper/);
+  for (const block of blocks.slice(1)) {
+    if (products.length >= MAX_PER_STORE) break;
+    const chunk = block.slice(0, 9000);
+    const linkM = chunk.match(/<a\s+href="(\/products\/[^"]+)"[^>]*class="full-unstyled-link"[^>]*>([\s\S]*?)<\/a>/);
+    if (!linkM) continue;
+    const handle = linkM[1].split("?")[0].split("/products/")[1];
+    if (!handle) continue;
+    const url = `${origin}/products/${handle}`;
+    if (seen.has(url)) continue;
+    const title = cleanText(linkM[2]);
+    if (!title) continue;
+    seen.add(url);
+    let imageUrl = null;
+    const imgM = chunk.match(/<img\b[^>]*\bsrc="([^"]+)"/);
+    if (imgM) imageUrl = imgM[1].startsWith("//") ? `https:${imgM[1]}` : imgM[1];
+    const saleM = chunk.match(/price-item--sale[^>]*>\s*\$?\s*([\d,]+(?:\.\d{2})?)/);
+    const cmpM = chunk.match(/<s class="price-item[^"]*"[^>]*>\s*\$?\s*([\d,]+(?:\.\d{2})?)/);
+    let priceAmount = null;
+    if (saleM) priceAmount = parseFloat(saleM[1].replace(/,/g, ""));
+    if (priceAmount == null || !Number.isFinite(priceAmount)) {
+      const regM = chunk.match(/price__regular[\s\S]{0,500}?price-item--regular[^>]*>\s*\$?\s*([\d,]+(?:\.\d{2})?)/);
+      if (regM) priceAmount = parseFloat(regM[1].replace(/,/g, ""));
+    }
+    const compareAmount = cmpM ? parseFloat(cmpM[1].replace(/,/g, "")) : null;
+    const soldOut = /price--sold-out/.test(chunk) || /badge[^>]*>\s*Sold out\s*</.test(chunk);
+    products.push({
+      title,
+      url,
+      priceText: priceAmount == null ? null : money(priceAmount),
+      priceAmount,
+      compareAtText: compareAmount != null && Number.isFinite(compareAmount) && compareAmount !== priceAmount ? money(compareAmount) : null,
+      imageUrl,
+      ...(soldOut ? { soldOut: true } : {})
+    });
+  }
+  return products;
 }
 function parseOpencartJournal(html) {
   const clean = html.replace(/<style[\s\S]*?<\/style>/g, "").replace(/<script[\s\S]*?<\/script>/g, "");
@@ -734,6 +789,8 @@ function parseForStore(store, text) {
       return parseMagento(text);
     case "shopify":
       return parseShopify(text);
+    case "shopifyDawn":
+      return parseShopifyDawn(text, new URL(store.searchUrl("x")).origin);
     case "opencartJournal":
       return parseOpencartJournal(text);
     case "opencartClassic":
@@ -852,10 +909,11 @@ async function searchStore(store, query, variantQueries) {
         message: `${store.name} is showing a bot-check page right now, so its listings can't be loaded here. You can open its own search results instead.`, products: [] };
     }
     let products = parseForStore(store, text);
-    if (products.length === 0 && store.parser === "shopify") {
-      const suggestUrl = `https://seforimdeals.com/search/suggest.json?q=${enc(vq)}&resources%5Btype%5D=product&resources%5Blimit%5D=10`;
+    if (products.length === 0 && (store.parser === "shopify" || store.parser === "shopifyDawn")) {
+      const origin = new URL(store.searchUrl("x")).origin;
+      const suggestUrl = `${origin}/search/suggest.json?q=${enc(vq)}&resources%5Btype%5D=product&resources%5Blimit%5D=10`;
       const suggestText = await fetchViaChain(suggestUrl);
-      if (suggestText) products = parseShopifySuggest(suggestText);
+      if (suggestText) products = parseShopifySuggest(suggestText, origin);
     }
     perVariant.push(products);
   }

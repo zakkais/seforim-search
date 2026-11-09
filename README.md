@@ -3,10 +3,10 @@
 Live site: https://zakkais.github.io/seforim-search/
 
 One search box that shows the actual product listings — cover, title, and
-price — from six seforim stores, sorted together in one merged grid
+price — from seven seforim stores, sorted together in one merged grid
 (each card still carries its store badge):
 
-Z. Berman Books · SeforimDeals · SeforimPlace ·
+Z. Berman Books · SeforimDeals · MySefer · SeforimPlace ·
 Hamafitz · Greenfield Judaica · eSicha
 
 Clicking a listing opens it on the store's own product page. Filters:
