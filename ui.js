@@ -25,7 +25,7 @@
 // Searching stays open without signing in, and there is no checkout
 // and no tracking in this file.
 
-import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant, shippingEstimate } from "./app.js?v=15";
+import { STORES, WORKER_URL, expandQuery, searchStore, sortProducts, productSignature, signaturesConflict, groupProducts, matchCandidates, filterRelevant, shippingEstimate } from "./app.js?v=16";
 
 const LS_STORES = "ssp:store-selection";
 const LS_SORT = "ssp:sort-mode";
